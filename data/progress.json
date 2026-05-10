@@ -1,0 +1,21 @@
+{
+  "study_progress": {
+    "语文": 5,
+    "数学": 0,
+    "英语": 0,
+    "物理": 0,
+    "化学": 0,
+    "生物": 0
+  },
+  "wrong_questions": {},
+  "current_subject": "语文",
+  "subject_kp_indexes": {
+    "语文": 5
+  },
+  "last_study_time": {
+    "语文": {
+      "timestamp": "4",
+      "kp_index": 4
+    }
+  }
+}

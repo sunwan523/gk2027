@@ -1,0 +1,914 @@
+[
+  {
+    "day": 1,
+    "date": "2026-05-08",
+    "weekday": "Friday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "集合",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "运动学",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "物质结构",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞结构",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "现代文阅读",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "词汇",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 2,
+    "date": "2026-05-09",
+    "weekday": "Saturday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "函数基础",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "牛顿定律",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "氧化还原反应",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞代谢",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "文言文阅读",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "语法",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 3,
+    "date": "2026-05-10",
+    "weekday": "Sunday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "二次函数",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "功和能",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "离子反应",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "遗传基础",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "古诗词鉴赏",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "阅读理解",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 4,
+    "date": "2026-05-11",
+    "weekday": "Monday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "数列",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "电学基础",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "电化学",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生态系统",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "作文",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "完形填空",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 5,
+    "date": "2026-05-12",
+    "weekday": "Tuesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "概率统计",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "磁场",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "化学反应速率",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生命活动调节",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "语言运用",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "写作",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 6,
+    "date": "2026-05-13",
+    "weekday": "Wednesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "立体几何",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "电磁感应",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "化学平衡",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生物技术",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "现代文阅读",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "词汇",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 7,
+    "date": "2026-05-14",
+    "weekday": "Thursday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "解析几何",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "运动学",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "物质结构",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞结构",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "文言文阅读",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "语法",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 8,
+    "date": "2026-05-15",
+    "weekday": "Friday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "导数",
+        "questions_count": 5,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "牛顿定律",
+        "questions_count": 5,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "氧化还原反应",
+        "questions_count": 5,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞代谢",
+        "questions_count": 5,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "古诗词鉴赏",
+        "questions_count": 5,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "阅读理解",
+        "questions_count": 5,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 9,
+    "date": "2026-05-16",
+    "weekday": "Saturday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "立体几何",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "电学基础",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "电化学",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生态系统",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "古诗词鉴赏",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "阅读理解",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 10,
+    "date": "2026-05-17",
+    "weekday": "Sunday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "解析几何",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "磁场",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "化学反应速率",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生命活动调节",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "作文",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "完形填空",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 11,
+    "date": "2026-05-18",
+    "weekday": "Monday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "导数",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "电磁感应",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "化学平衡",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生物技术",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "语言运用",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "写作",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 12,
+    "date": "2026-05-19",
+    "weekday": "Tuesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "向量",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "运动学",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "物质结构",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞结构",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "现代文阅读",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "词汇",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 13,
+    "date": "2026-05-20",
+    "weekday": "Wednesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "三角函数",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "牛顿定律",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "氧化还原反应",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "细胞代谢",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "文言文阅读",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "语法",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 14,
+    "date": "2026-05-21",
+    "weekday": "Thursday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "集合",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "功和能",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "离子反应",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "遗传基础",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "古诗词鉴赏",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "阅读理解",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 15,
+    "date": "2026-05-22",
+    "weekday": "Friday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "函数基础",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "电学基础",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "电化学",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生态系统",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "作文",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "完形填空",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 16,
+    "date": "2026-05-23",
+    "weekday": "Saturday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "二次函数",
+        "questions_count": 8,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "磁场",
+        "questions_count": 8,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "化学反应速率",
+        "questions_count": 8,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "生命活动调节",
+        "questions_count": 8,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "语言运用",
+        "questions_count": 8,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "写作",
+        "questions_count": 8,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 17,
+    "date": "2026-05-24",
+    "weekday": "Sunday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 18,
+    "date": "2026-05-25",
+    "weekday": "Monday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 19,
+    "date": "2026-05-26",
+    "weekday": "Tuesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 20,
+    "date": "2026-05-27",
+    "weekday": "Wednesday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "综合复习",
+        "questions_count": 10,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 21,
+    "date": "2026-05-28",
+    "weekday": "Thursday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 22,
+    "date": "2026-05-29",
+    "weekday": "Friday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 23,
+    "date": "2026-05-30",
+    "weekday": "Saturday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      }
+    }
+  },
+  {
+    "day": 24,
+    "date": "2026-05-31",
+    "weekday": "Sunday",
+    "completed": false,
+    "tasks": {
+      "数学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "物理": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "化学": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "生物": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "语文": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      },
+      "英语": {
+        "knowledge_point": "模拟训练",
+        "questions_count": 15,
+        "completed": false
+      }
+    }
+  }
+]
