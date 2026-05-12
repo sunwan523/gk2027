@@ -2,32 +2,32 @@ subjects_config = {
     "语文": {
         "color": "#8b5cf6",
         "name": "语文",
-        "total_kps": 5
+        "total_kps": 27
     },
     "数学": {
         "color": "#3b82f6",
         "name": "数学",
-        "total_kps": 10
+        "total_kps": 30
     },
     "英语": {
         "color": "#ec4899",
         "name": "英语",
-        "total_kps": 5
+        "total_kps": 32
     },
     "物理": {
         "color": "#ef4444",
         "name": "物理",
-        "total_kps": 6
+        "total_kps": 33
     },
     "化学": {
         "color": "#f59e0b",
         "name": "化学",
-        "total_kps": 6
+        "total_kps": 40
     },
     "生物": {
         "color": "#10b981",
         "name": "生物",
-        "total_kps": 6
+        "total_kps": 41
     }
 }
 
