@@ -7,6 +7,7 @@
 $ErrorActionPreference = 'Continue'
 $root = 'D:\codex\gaokao\gk2027'
 $PY = 'C:\Python314\python.exe'
+$SSHKEY = 'C:\Users\sunwa\.ssh\id_ed25519_gk2027'
 $ROUTER = 'root@192.168.100.88'
 $IMG = 'ghcr.io/sunwan523/gk2027-mobile:latest'
 
@@ -24,7 +25,7 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[4/4] 软路由 192.168.100.88 更新容器 ..."
-ssh -o ConnectTimeout=8 $ROUTER "docker pull $IMG && docker rm -f gk2027-mobile && docker run -d --name gk2027-mobile --restart always -p 8577:8577 -v /root/gk2027-data:/app/data $IMG" 2>&1
+ssh -i $SSHKEY -o BatchMode=yes -o ConnectTimeout=8 $ROUTER "mkdir -p /root/gk2027-data && docker pull $IMG && docker rm -f gk2027-mobile && docker run -d --name gk2027-mobile --restart always -p 8577:8577 -v /root/gk2027-data:/app/data $IMG" 2>&1
 
 Write-Host ""
 Write-Host "部署完成。"
