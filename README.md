@@ -6,9 +6,9 @@
 
 | 部署点 | 访问地址 | 方式 | 状态 |
 |--------|----------|------|------|
-| 本地 Windows | `http://p.mhtc.top:8577`（DDNS + 端口映射） | 系统服务 `svc.py` | 运行中 |
-| 软路由 iStoreOS | `http://192.168.100.88:8577` | Docker 容器 `gk2027-mobile`（`--restart always`） | 运行中 |
-| 爱快软路由 | `http://192.168.100.1:8577` | Docker Compose（Web 编排） | 运行中 |
+| 爱快软路由（主用） | `http://p.mhtc.top:8577` / `http://192.168.100.1:8577` | Docker Compose（Web 编排） | 运行中 |
+| 软路由 iStoreOS（备用） | `http://192.168.100.88:8577` | Docker 容器 `gk2027-mobile`（`--restart always`） | 运行中 |
+| 本地 Windows | — | 已停用，不再开机自启 | 停用 |
 
 代码仓库：`https://github.com/sunwan523/gk2027`（main 分支）
 镜像：`ghcr.io/sunwan523/gk2027-mobile:latest`（amd64 + arm64 多架构）
@@ -19,9 +19,10 @@
 并安装了 `post-commit` hook：**每次 `git commit` 后自动在后台执行** `tools\deploy.ps1`：
 
 1. `git push` → GitHub
-2. 本地 Windows 服务重启（`svc.py restart`）
-3. 构建并推送多架构镜像到 ghcr（`build-image.ps1`）
-4. SSH 免密登录软路由 `192.168.100.88` 拉取最新镜像并重建容器
+2. 构建并推送多架构镜像到 ghcr（`build-image.ps1`）
+3. SSH 免密登录软路由 `192.168.100.88` 拉取最新镜像并重建容器
+
+（本地 Windows 服务已停用，不再参与自动部署。）
 
 爱快无法命令行代做，每次提交后需在爱快 Web 手动更新，具体操作见下文「爱快手动更新步骤」。
 部署日志：`logs\deploy.log`。
