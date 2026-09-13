@@ -203,6 +203,10 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(target, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    if path is None:
+        # 主库：任何部署点首次使用都必须有 schema（新环境主库没有其他建表入口）
+        conn.executescript(_render_schema())
+        conn.commit()
     return conn
 
 
