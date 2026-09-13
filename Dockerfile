@@ -12,8 +12,8 @@ COPY . /app
 COPY fonts/ /app/fonts/
 ENV GK_FONT_DIR=/app/fonts
 
-# 依赖
-RUN pip install --no-cache-dir -r requirements.txt
+# 依赖（国内网络用清华镜像源；构建成功后部署端只拉取成品镜像，无需 pip）
+RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
 # 运行态目录（容器内 data/output/logs 挂载或新建）
 RUN mkdir -p /app/data /app/output /app/logs
