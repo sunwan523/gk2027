@@ -172,8 +172,7 @@ FOR EACH ROW WHEN NEW.source_type NOT IN ({with_year})
              AND (NEW.year IS NOT NULL OR NEW.paper IS NOT NULL)
 BEGIN
     SELECT RAISE(ABORT,
-      '禁止：非真题来源不得填写 year/paper。这是旧项目最严重的错误，'
-      || '让编造的题顶着真实年份卷别出现。如需标注出处请用 source_ref。');
+      '禁止：非真题来源不得填写 year/paper。这是旧项目最严重的错误，让编造的题顶着真实年份卷别出现。如需标注出处请用 source_ref。');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_no_fake_provenance_update
