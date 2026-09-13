@@ -1,0 +1,15 @@
+.git
+.gitignore
+__pycache__
+*.pyc
+data
+output
+logs
+*.pid
+x
+fonts/msyh.ttc.bak
+*.tar
+*.md
+tools
+*.ps1
+*.bat

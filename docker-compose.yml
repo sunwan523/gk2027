@@ -1,0 +1,14 @@
+# gk2027 高考复习系统 —— 爱快/软路由 Docker Compose 部署
+# 参照 iptv 的爱快实测约束：镜像走 ghcr 南大加速、挂载必须相对路径、端口 8577
+# 爱快操作：Docker → 编排 → 新建 → 粘贴本文件 → 手动建 ./data 目录 → 开启
+services:
+  gk2027-mobile:
+    image: ghcr.nju.edu.cn/sunwan523/gk2027-mobile:latest
+    container_name: gk2027-mobile
+    restart: always
+    ports:
+      - "8577:8577"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - PORT=8577
