@@ -6,6 +6,9 @@
 
 $ErrorActionPreference = 'Continue'
 $root = 'D:\codex\gaokao\gk2027'
+$logFile = Join-Path $root 'logs\deploy.log'
+New-Item -ItemType Directory -Force -Path (Split-Path $logFile) | Out-Null
+Start-Transcript -Path $logFile -Append -Force
 $PY = 'C:\Python314\python.exe'
 $SSHKEY = 'C:\Users\sunwa\.ssh\id_ed25519_gk2027'
 $ROUTER = 'root@192.168.100.88'
