@@ -41,6 +41,27 @@ SYSTEM_PROMPT = """你是一位高中辅导老师。根据用户提供的知识�
 }"""
 
 
+def _chat(payload: dict) -> dict:
+    """通用 DeepSeek 对话请求，返回完整响应体。"""
+    req = urllib.request.Request(
+        API_URL,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {API_KEY}",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as e:
+        err_body = e.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"DeepSeek API错误 {e.code}: {err_body[:200]}")
+    except Exception as e:
+        raise RuntimeError(f"API调用失败: {e}")
+
+
 def generate_quiz(subject: str, kp_name: str, points: list[str], count: int = 5) -> list[dict]:
     """根据知识点要点生成AI题目。
 

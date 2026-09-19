@@ -80,7 +80,12 @@ app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
 @app.get("/api/me")
 async def api_me(req: Request):
     u = _user_from(req)
-    return {"user": {"id": u["id"], "name": u["name"]} if u else None}
+    if not u:
+        return {"user": None}
+    from core import diary as diary_mod
+    prof = diary_mod.get_profile(_conn(u["id"]), u["id"])
+    return {"user": {"id": u["id"], "name": u["name"], "nickname": prof["nickname"],
+                     "birthday": prof["birthday"], "avatar": prof["avatar"]}}
 
 
 @app.post("/api/login")
@@ -487,6 +492,246 @@ async def api_export_review(req: Request):
 async def api_export_dictation(req: Request):
     from core import pdf
     return _export(req, pdf.build_dictation_pdf)
+
+
+# ----------------------------------------------------------------------
+# 📖 空间（成长记录）：签到 / 随手记 / 体重 / 用户设置 / AI整理 / 隐秘空间
+# ----------------------------------------------------------------------
+from core import diary as diary_mod
+
+PHOTO_DIR = os.path.join(BASE, "data", "photos")
+os.makedirs(PHOTO_DIR, exist_ok=True)
+app.mount("/photos", StaticFiles(directory=PHOTO_DIR), name="photos")
+
+# 隐秘空间解锁会话（单进程内存，30 分钟；重启后重新解锁一次即可）
+PRIVATE_SESSIONS = {}
+PRIVATE_TTL = 30 * 60
+
+
+def _priv_key(uid: str):
+    s = PRIVATE_SESSIONS.get(uid)
+    if s and s["exp"] > time.time():
+        return s["key"]
+    return None
+
+
+@app.get("/api/profile")
+async def api_profile(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    return diary_mod.get_profile(c, u["id"])
+
+
+@app.post("/api/profile/save")
+async def api_profile_save(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    return diary_mod.save_profile(c, u["id"],
+                                  nickname=body.get("nickname", ""),
+                                  birthday=body.get("birthday", ""))
+
+
+@app.post("/api/profile/avatar")
+async def api_profile_avatar(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        p = diary_mod.set_avatar(c, u["id"], body.get("data", ""))
+        return {"ok": True, "avatar": p}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/diary/save")
+async def api_diary_save(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        date = body["date"]
+        kind = body.get("kind", "note")
+        is_private = 1 if body.get("is_private") else 0
+        key = _priv_key(u["id"]) if is_private else None
+        if is_private and key is None:
+            return JSONResponse({"error": "隐秘内容需先解锁高级密码"}, status_code=403)
+        photos = []
+        for ph in (body.get("photos") or [])[:6]:
+            if isinstance(ph, str) and ph.startswith("data:image/"):
+                kind_dir = "private" if is_private else ("selfie" if kind == "sign" else "note")
+                photos.append(diary_mod.save_photo(u["id"], kind_dir, date, ph))
+        diary_mod.save_diary(c, u["id"], date, kind,
+                             mood=body.get("mood", ""),
+                             text=body.get("text", ""),
+                             photos=photos,
+                             category=body.get("category", ""),
+                             summary=body.get("summary", ""),
+                             advice=body.get("advice", ""),
+                             is_late=1 if body.get("is_late") else 0,
+                             is_private=is_private, key=key)
+        return {"ok": True}
+    except KeyError:
+        return JSONResponse({"error": "缺少 date"}, status_code=400)
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/diary/ai_organize")
+async def api_diary_organize(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    text = (body.get("text") or "").strip()
+    if not text:
+        return JSONResponse({"error": "内容为空"}, status_code=400)
+    if len(text) > 1500:
+        return JSONResponse({"error": "内容过长（限1500字）"}, status_code=400)
+    try:
+        return diary_mod.organize(text)
+    except Exception as e:
+        return JSONResponse({"error": "AI整理失败：%s" % str(e)[:120]}, status_code=502)
+
+
+@app.get("/api/diary/month")
+async def api_diary_month(req: Request, ym: str = ""):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    try:
+        return diary_mod.get_month(c, u["id"], ym or date.today().strftime("%Y-%m"))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/diary/day")
+async def api_diary_day(req: Request, date: str = ""):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    try:
+        return diary_mod.get_day(c, u["id"], date or date.today().isoformat(),
+                                 key=_priv_key(u["id"]))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/diary/list")
+async def api_diary_list(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    return {"items": diary_mod.list_all(c, u["id"], key=_priv_key(u["id"]))}
+
+
+@app.post("/api/diary/delete")
+async def api_diary_delete(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    return {"ok": bool(diary_mod.delete_diary(c, u["id"], int(body.get("id", 0))))}
+
+
+@app.post("/api/weight/save")
+async def api_weight_save(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        diary_mod.save_weight(c, u["id"], body["date"], float(body.get("value", 0)),
+                              note=body.get("note", ""))
+        return {"ok": True}
+    except (KeyError, ValueError) as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.get("/api/weight/list")
+async def api_weight_list(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    return {"items": diary_mod.get_weights(c, u["id"])}
+
+
+@app.post("/api/weight/delete")
+async def api_weight_delete(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    diary_mod.delete_weight(c, u["id"], body.get("date", ""))
+    return {"ok": True}
+
+
+# ---- 隐秘空间 ----
+@app.get("/api/diary/private/status")
+async def api_private_status(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    st = diary_mod.get_private_status(c, u["id"])
+    return {"enabled": st["enabled"], "unlocked": _priv_key(u["id"]) is not None}
+
+
+@app.post("/api/diary/private/config")
+async def api_private_config(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        diary_mod.set_private_pwd(c, u["id"], body.get("new_pwd", ""),
+                                  old_pwd=body.get("old_pwd", ""))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+    PRIVATE_SESSIONS.pop(u["id"], None)  # 改密后旧解锁立即失效
+    return {"ok": True}
+
+
+@app.post("/api/diary/private/unlock")
+async def api_private_unlock(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        key = diary_mod.verify_private_pwd(c, u["id"], body.get("pwd", ""))
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=403)
+    PRIVATE_SESSIONS[u["id"]] = {"key": key, "exp": time.time() + PRIVATE_TTL}
+    return {"ok": True}
+
+
+@app.post("/api/diary/private/lock")
+async def api_private_lock(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    PRIVATE_SESSIONS.pop(u["id"], None)
+    return {"ok": True}
+
+
+@app.get("/api/diary/private/photo")
+async def api_private_photo(req: Request, p: str = ""):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    if _priv_key(u["id"]) is None:
+        return JSONResponse({"error": "需要解锁"}, status_code=403)
+    try:
+        full = diary_mod.photo_abs_path(p)
+    except ValueError:
+        return JSONResponse({"error": "非法路径"}, status_code=400)
+    if not os.path.isfile(full):
+        return JSONResponse({"error": "文件不存在"}, status_code=404)
+    return FileResponse(full)
 
 
 if __name__ == "__main__":

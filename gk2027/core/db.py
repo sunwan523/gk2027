@@ -234,6 +234,8 @@ def init_db(path: str | None = None, *, seed: bool = False) -> sqlite3.Connectio
     conn = connect(path)
     conn.executescript(_render_schema())
     conn.commit()
+    from core import diary
+    diary.create_tables(conn)   # 📖 空间：签到/随手记/体重/用户设置/隐秘空间
     if seed:
         from core import graph, seed_quiz
         graph.seed_graph(conn)

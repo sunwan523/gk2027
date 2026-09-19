@@ -110,7 +110,7 @@ const SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物"];
 
 // ---------- 页面切换 ----------
 const PAGE_ACT = {
-  tabLearn: "浏览", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出",
+  tabLearn: "浏览", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出", tabSpace: "空间",
 };
 function switchTab(tabId) {
   $$(".tab-page").forEach(p => p.classList.add("hidden"));
@@ -123,6 +123,7 @@ function switchTab(tabId) {
   if (tabId === "tabStats") renderStats();
   if (tabId === "tabRecite") renderRecite();
   if (tabId === "tabExport") renderExport();
+  if (tabId === "tabSpace") renderSpace();
   window.scrollTo(0, 0);
 }
 
@@ -130,8 +131,12 @@ function switchTab(tabId) {
 async function refreshHeader() {
   try {
     const d = await api("/api/header");
+    const nm = (me && me.nickname) || d.uname;
+    const av = me && me.avatar
+      ? `<img class="h-av" src="/${esc(me.avatar)}" alt="">`
+      : `<span class="h-av h-av-t">${esc(String(nm).slice(0, 1))}</span>`;
     $("#headerBar").innerHTML =
-      `<span class="h-name">🧑 ${esc(d.uname)}</span>` +
+      `<button class="h-user" onclick="switchTab('tabSpace')">${av}<span>${esc(nm)}</span></button>` +
       `<span class="h-stat">🔥 ${d.streak} 天</span>` +
       `<span class="h-stat">🏆 ${d.mastered}/${d.total}</span>` +
       `<span class="h-xp">今日 XP ${d.xp_today}/${d.xp_goal} ${d.goal_done ? "✅" : ""}` +
@@ -766,3 +771,547 @@ function renderExport() {
   try { me = (await api("/api/me")).user; } catch (e) { me = null; }
   if (me) { await enterApp(); } else { showLogin(); }
 })();
+
+
+// ================== 📖 空间（成长记录） ==================
+const space = {
+  month: "", selDate: "", camStream: null, camShot: null,
+  notePics: [], notePriv: false,
+  priv: { enabled: false, unlocked: false },
+  profile: null, monthData: null, weights: [],
+  _aiing: false,
+};
+const SPACE_MOODS = ["😀 开心", "😐 平淡", "😔 低落", "💪 加油", "🤯 疲惫"];
+
+function todayStr() { const d = new Date(); return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0"); }
+
+function compressImg(dataURL, maxW) {
+  maxW = maxW || 1280;
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const scale = Math.min(1, maxW / img.width);
+        const c = document.createElement("canvas");
+        c.width = Math.max(1, Math.round(img.width * scale));
+        c.height = Math.max(1, Math.round(img.height * scale));
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        res(c.toDataURL("image/jpeg", 0.82));
+      } catch (e) { res(dataURL); }
+    };
+    img.onerror = () => res(dataURL);
+    img.src = dataURL;
+  });
+}
+function fileToDataURL(f) {
+  return new Promise((res) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.readAsDataURL(f);
+  });
+}
+
+async function renderSpace() {
+  const el = $("#tabSpace");
+  try {
+    me = (await api("/api/me")).user;
+    refreshHeader();
+  } catch (e) {}
+  const [profile, status, month, weights, list, today] = await Promise.all([
+    api("/api/profile").catch(() => ({})),
+    api("/api/diary/private/status").catch(() => ({ enabled: false, unlocked: false })),
+    api("/api/diary/month?ym=" + space.month).catch(() => ({ days: {}, streak: 0, total_sign: 0 })),
+    api("/api/weight/list").catch(() => ({ items: [] })),
+    api("/api/diary/list").catch(() => ({ items: [] })),
+    api("/api/diary/day?date=" + todayStr()).catch(() => ({ date: todayStr(), sign: null, note: null, weight: null })),
+  ]);
+  space.profile = profile; space.monthData = month; space.weights = weights.items || [];
+  space.priv = { enabled: !!status.enabled, unlocked: !!status.unlocked };
+  space.selDate = space.selDate || todayStr();
+
+  const nm = (me && me.nickname) || (me && me.name) || "";
+  const av = (profile && profile.avatar) || (me && me.avatar) || "";
+  const bd = (profile && profile.birthday) || "";
+  el.innerHTML = `
+  <div class="page-top"><h3 style="font-size:18px;">📖 我的空间</h3></div>
+  <div class="space-user">
+    ${av ? `<div class="space-avatar"><img src="/${esc(av)}" alt=""></div>` : `<div class="space-avatar">${esc(String(nm).slice(0, 1) || "我")}</div>`}
+    <div>
+      <div class="su-name">${esc(nm || "同学")}</div>
+      <div class="su-sub">${bd ? "🎂 " + esc(bd) + " · " : ""}连续签到 <b>${month.streak}</b> 天 · 共 ${month.total_sign} 次</div>
+    </div>
+    <button class="su-edit" onclick="openSettings()">✏️ 设置</button>
+  </div>
+
+  ${space.priv.unlocked ? `<div class="priv-card space-card"><h4>🔓 隐秘空间已解锁（30分钟内有效）</h4></div>` : ""}
+  ${renderSignCard(today)}
+  ${renderNoteCard()}
+  ${renderWeightCard()}
+  <div class="space-card"><h4>📅 时间轴</h4>${renderCal(month, today)}</div>
+  <div class="space-card">${renderPrivCard()}</div>
+  <div class="space-card"><h4>🕰 全部记录</h4>${renderTimeline(list.items || [])}</div>
+  <div style="height:20px"></div>`;
+  bindSpaceEvents();
+}
+
+function renderSignCard(today) {
+  const t = todayStr();
+  if (today && today.sign) {
+    const s = today.sign;
+    return `<div class="space-card">
+      <h4>📷 今日签到 ✓</h4>
+      <div class="sign-done">
+        ${s.photos && s.photos[0] ? `<img src="/${esc(s.photos[0])}" alt="签到照">` : ""}
+        <div class="sd-txt">
+          <div class="sd-badge">已签到 ${s.is_late ? "（补签）" : ""}</div>
+          ${esc(s.mood || "今天也坚持下来了 💪")}
+          <div class="dv-meta">${esc((s.created_at || "").slice(5, 16))}</div>
+        </div>
+      </div>
+    </div>`;
+  }
+  return `<div class="space-card">
+    <h4>📷 今日自拍签到</h4>
+    <div class="tip">每天一张照片 + 一句话，见证 90 天的坚持</div>
+    <div class="cam-wrap" id="camWrap">${space.camShot
+      ? `<img id="camShot" src="${space.camShot}" alt="预览">`
+      : `<div style="color:#888;padding:30px;text-align:center;font-size:13px;">点击"打开摄像头"自拍</div>`}</div>
+    <div class="cam-actions" id="camActions">
+      <button class="cam-start" id="camStart" ${space.camShot ? "style='display:none'" : ""}>📷 打开摄像头</button>
+      <button class="cam-start" id="camPick" style="background:#7a6ad9;${space.camShot ? "display:none" : ""}">🖼 从相册选择</button>
+      <button class="cam-snap" id="camSnap" style="display:none">📸 拍照</button>
+      <button class="cam-stop" id="camRetry" style="display:none">🔄 重拍</button>
+    </div>
+    <input type="file" id="signFile" accept="image/*" style="display:none">
+    <input id="signMood" class="input" placeholder="今天的一句话（选填）" maxlength="50">
+    <div class="mood-row" id="moodRow"></div>
+    <button class="btn primary" id="submitSign" style="margin-top:8px">✅ 完成签到</button>
+  </div>`;
+}
+
+function renderNoteCard() {
+  return `<div class="space-card">
+    <h4>📝 随手记</h4>
+    <div class="tip">写点心里话，可以用"✨ AI 整理"自动分类存档</div>
+    <textarea id="noteText" class="input" placeholder="今天学了什么？有什么想法、心情、反思？"></textarea>
+    <div class="photo-pre" id="notePics"></div>
+    <div class="photo-add" id="noteAddPic">＋</div>
+    <input type="file" id="noteFile" accept="image/*" multiple style="display:none">
+    <label class="priv-switch"><input type="checkbox" id="notePriv"> 🔒 存入隐秘空间（需高级密码才可见）</label>
+    <div id="noteAiOut"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="noteAi">✨ AI 整理</button>
+      <button class="btn primary" id="noteSave">💾 保存</button>
+    </div>
+  </div>`;
+}
+
+function renderWeightCard() {
+  const last = space.weights[space.weights.length - 1];
+  return `<div class="space-card">
+    <h4>⚖️ 体重记录</h4>
+    <div class="weight-row">
+      <input id="wValue" class="input" type="number" step="0.1" min="20" max="300" placeholder="${last ? last.value + " kg" : "kg"}">
+      <button class="btn primary" id="wSave" style="width:auto;padding:10px 18px;">记录</button>
+    </div>
+    <div class="weight-chart">${weightSvg(space.weights)}</div>
+  </div>`;
+}
+
+function weightSvg(items) {
+  if (!items || items.length < 1) return `<div class="w-note">还没有体重记录，记录第一条开始吧</div>`;
+  const last = items.slice(-14);
+  const W = 320, H = 120, pad = 26;
+  const vals = last.map(i => i.value);
+  const min = Math.min.apply(null, vals), max = Math.max.apply(null, vals);
+  const span = Math.max(0.5, max - min);
+  const px = (i) => pad + i * (W - pad * 2) / Math.max(1, last.length - 1);
+  const py = (v) => H - pad - (v - min) / span * (H - pad * 2);
+  const pts = last.map((i, idx) => px(idx).toFixed(1) + "," + py(i.value).toFixed(1)).join(" ");
+  const lastP = last[last.length - 1];
+  const diff = items.length > 1 ? (items[items.length - 1].value - items[items.length - 2].value) : 0;
+  return `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
+    <polyline points="${pts}" fill="none" stroke="#4a90d9" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${px(last.length - 1)}" cy="${py(lastP.value)}" r="4" fill="#4a90d9"/>
+  </svg>
+  <div class="w-note">最近：${lastP.value} kg${diff !== 0 ? "（" + (diff > 0 ? "+" : "") + diff.toFixed(1) + "）" : ""} · 共 ${items.length} 条</div>`;
+}
+
+function renderCal(month, today) {
+  const ym = space.month || todayStr().slice(0, 7);
+  const [y, m] = ym.split("-").map(Number);
+  const days = month.days || {};
+  const first = new Date(y, m - 1, 1).getDay();
+  const ndays = new Date(y, m, 0).getDate();
+  const t = todayStr();
+  let cells = `<div class="cw">日</div><div class="cw">一</div><div class="cw">二</div><div class="cw">三</div><div class="cw">四</div><div class="cw">五</div><div class="cw">六</div>`;
+  for (let i = 0; i < first; i++) cells += `<div class="cd blank"></div>`;
+  for (let d = 1; d <= ndays; d++) {
+    const ds = ym + "-" + String(d).padStart(2, "0");
+    const info = days[ds] || {};
+    const dots = (info.sign ? '<i class="s"></i>' : "") + (info.note ? '<i class="n"></i>' : "") + (info.weight != null ? '<i class="w"></i>' : "");
+    const cls = ["cd", ds === space.selDate ? "sel" : "", ds === t ? "today" : ""].join(" ");
+    cells += `<div class="${cls}" onclick="pickDate('${ds}')">${d}<span class="dot">${dots}</span></div>`;
+  }
+  return `<div class="cal-head">
+    <button onclick="setMonth(-1)">‹</button>
+    <span class="cal-m">${y} 年 ${m} 月</span>
+    <button onclick="setMonth(1)">›</button>
+  </div>
+  <div class="cal-grid">${cells}</div>
+  <div class="cal-stats">
+    <span>📷 签到 <b>${month.total_sign}</b></span>
+    <span>🔥 连续 <b>${month.streak}</b> 天</span>
+    <span class="tip">●绿=签到 ●蓝=随手记 ●橙=体重</span>
+  </div>
+  <div id="dayView"></div>`;
+}
+
+function renderTimeline(items) {
+  if (!items.length) return `<div class="tip">还没有记录，从今天的签到开始吧</div>`;
+  return items.map(it => `
+    <div class="tl-item">
+      <div class="tl-date">${esc(it.date)}<br><span style="font-size:11px;">${esc((it.created_at || "").slice(11, 16))}</span></div>
+      <div class="tl-body">
+        <span class="tl-tag">${it.label}</span>
+        ${it.is_private && it.locked ? `<div class="locked-note">🔒 隐秘内容（需高级密码）</div>`
+          : `<div class="tl-txt">${esc(it.mood ? "【" + it.mood + "】" : "")}${esc(it.text || it.summary || "")}</div>`}
+        ${it.category ? `<div class="dv-meta">分类：${esc(it.category)}${it.summary ? " · " + esc(it.summary) : ""}</div>` : ""}
+        ${(it.photos || []).slice(0, 3).map(ph => `<img src="${(it.is_private ? "/api/diary/private/photo?p=" : "/") + esc(ph)}" alt="">`).join("")}
+      </div>
+    </div>`).join("");
+}
+
+function renderPrivCard() {
+  const p = space.priv;
+  const body = !p.enabled ? `
+    <div class="tip">设置高级密码后，可把不想被别人看到的记录存进隐秘空间（后台加密存储）</div>
+    <div class="priv-row"><input id="privNew" class="input" type="password" placeholder="设置高级密码（至少4位）"></div>
+    <button class="btn primary" id="privSet" style="margin-top:8px">🔒 开启隐秘空间</button>`
+    : (!p.unlocked ? `
+    <div class="tip">输入高级密码解锁，30 分钟内可查看和写入隐秘内容</div>
+    <div class="priv-row"><input id="privPwd" class="input" type="password" placeholder="高级密码"></div>
+    <button class="btn primary" id="privUnlock" style="margin-top:8px">🔓 解锁</button>
+    <div style="margin-top:8px"><button class="btn ghost" id="privChange">修改密码</button></div>`
+    : `
+    <div class="tip">已解锁，随手记勾选"🔒 存入隐秘空间"即可写入；内容在服务器后台以密文存储</div>
+    <div class="btn-row">
+      <button class="btn ghost" id="privLock">🔐 立即锁定</button>
+      <button class="btn ghost" id="privChange2">修改密码</button>
+    </div>`);
+  return `<h4>🔒 隐秘空间</h4>${body}`;
+}
+
+function bindSpaceEvents() {
+  // 签到
+  const cs = $("#camStart"), sn = $("#camSnap"), rt = $("#camRetry");
+  if (cs) cs.onclick = startCam;
+  if (sn) sn.onclick = snapShot;
+  if (rt) rt.onclick = () => { stopCam(); space.camShot = null; renderSpace(); };
+  const cp = $("#camPick"), sf = $("#signFile");
+  if (cp) cp.onclick = () => sf.click();
+  if (sf) sf.onchange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const d = await fileToDataURL(f);
+    if (!d.startsWith("data:image/")) { toast("请选择图片"); return; }
+    space.camShot = d;
+    renderSpace();
+  };
+  const moodRow = $("#moodRow");
+  if (moodRow) {
+    moodRow.innerHTML = SPACE_MOODS.map(m => `<button class="mood-btn" data-m="${esc(m)}">${esc(m)}</button>`).join("");
+    moodRow.querySelectorAll(".mood-btn").forEach(b => b.onclick = () => {
+      const inp = $("#signMood"); if (!inp) return;
+      const em = b.dataset.m.split(" ")[0];
+      inp.value = (inp.value ? inp.value + " " : "") + em;
+      moodRow.querySelectorAll(".mood-btn").forEach(x => x.classList.remove("sel"));
+      b.classList.add("sel");
+    });
+  }
+  const ss = $("#submitSign");
+  if (ss) ss.onclick = submitSign;
+  // 随手记
+  const nf = $("#noteFile"), addPic = $("#noteAddPic");
+  if (nf) nf.onchange = async (e) => {
+    for (const f of e.target.files || []) {
+      if (space.notePics.length >= 6) break;
+      const d = await fileToDataURL(f);
+      if (d.startsWith("data:image/")) space.notePics.push(d);
+    }
+    renderNotePics(); nf.value = "";
+  };
+  if (addPic) addPic.onclick = () => { const f = $("#noteFile"); if (f) f.click(); };
+  const np = $("#notePriv");
+  if (np) np.onchange = (e) => {
+    space.notePriv = e.target.checked;
+    if (space.notePriv && !space.priv.unlocked) {
+      toast("先在下方解锁隐秘空间");
+      e.target.checked = false; space.notePriv = false;
+    }
+  };
+  const ai = $("#noteAi");
+  if (ai) ai.onclick = aiOrganize;
+  const sv = $("#noteSave");
+  if (sv) sv.onclick = saveNote;
+  // 体重
+  const ws = $("#wSave");
+  if (ws) ws.onclick = saveWeight;
+  // 隐秘
+  const ps = $("#privSet");
+  if (ps) ps.onclick = async () => {
+    const v = ($("#privNew").value || "").trim();
+    if (v.length < 4) { toast("密码至少4位"); return; }
+    try { await post("/api/diary/private/config", { new_pwd: v }); toast("隐秘空间已开启 🔒"); renderSpace(); }
+    catch (e) { toast(e.message); }
+  };
+  const pu = $("#privUnlock");
+  if (pu) pu.onclick = async () => {
+    const v = ($("#privPwd").value || "").trim();
+    if (!v) { toast("输入密码"); return; }
+    try { await post("/api/diary/private/unlock", { pwd: v }); toast("已解锁 🔓"); renderSpace(); }
+    catch (e) { toast(e.message); }
+  };
+  const pl = $("#privLock");
+  if (pl) pl.onclick = async () => { await post("/api/diary/private/lock", {}); toast("已锁定"); renderSpace(); };
+  const pc = $("#privChange") || $("#privChange2");
+  if (pc) pc.onclick = () => openPrivChange();
+}
+
+function renderNotePics() {
+  const box = $("#notePics"); if (!box) return;
+  box.innerHTML = space.notePics.map((d, i) =>
+    `<div class="pp"><img src="${d}" alt=""><span class="pp-x" data-i="${i}">×</span></div>`).join("");
+  box.querySelectorAll(".pp-x").forEach(x => x.onclick = () => {
+    space.notePics.splice(Number(x.dataset.i), 1); renderNotePics();
+  });
+  const add = $(".photo-add");
+  if (add) add.style.display = space.notePics.length >= 6 ? "none" : "flex";
+}
+
+async function startCam() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+    toast("此浏览器不支持摄像头，可改用手机浏览器");
+    return;
+  }
+  try {
+    space.camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    const w = $("#camWrap");
+    w.innerHTML = `<video id="camVideo" autoplay playsinline></video>`;
+    w.querySelector("video").srcObject = space.camStream;
+    $("#camStart").style.display = "none";
+    $("#camSnap").style.display = "";
+    $("#camRetry").style.display = "";
+  } catch (e) {
+    toast("摄像头无法打开：" + (e.name === "NotAllowedError" ? "请允许摄像头权限" : "设备不可用"));
+  }
+}
+function snapShot() {
+  const v = $("#camVideo"); if (!v) return;
+  const c = document.createElement("canvas");
+  c.width = v.videoWidth || 640; c.height = v.videoHeight || 480;
+  c.getContext("2d").drawImage(v, 0, 0, c.width, c.height);
+  space.camShot = c.toDataURL("image/jpeg", 0.85);
+  stopCam();
+  renderSpace();
+}
+function stopCam() {
+  if (space.camStream) {
+    space.camStream.getTracks().forEach(t => t.stop());
+    space.camStream = null;
+  }
+}
+
+async function submitSign() {
+  if (!space.camShot) { toast("先拍一张自拍"); return; }
+  try {
+    const img = await compressImg(space.camShot);
+    await post("/api/diary/save", {
+      date: todayStr(), kind: "sign",
+      mood: ($("#signMood").value || "").trim(),
+      photos: [img],
+    });
+    space.camShot = null;
+    toast("签到成功 🎉");
+    renderSpace();
+  } catch (e) { toast(e.message); }
+}
+
+async function aiOrganize() {
+  const t = ($("#noteText").value || "").trim();
+  if (!t) { toast("先写点内容"); return; }
+  if (space.notePriv) { toast("隐秘内容不能发给 AI 整理"); return; }
+  if (space._aiing) return;
+  space._aiing = true;
+  $("#noteAiOut").innerHTML = `<div class="spinner">✨ AI 整理中…</div>`;
+  try {
+    const r = await post("/api/diary/ai_organize", { text: t });
+    $("#noteAiOut").innerHTML =
+      `<div class="ai-result"><span class="ai-cat">${esc(r.category)}</span>${esc(r.summary)}` +
+      (r.advice ? `<br><span style="color:#888">💡 ${esc(r.advice)}</span>` : "") + `</div>`;
+  } catch (e) {
+    $("#noteAiOut").innerHTML = `<div class="ai-result" style="color:#d9534f">${esc(e.message)}</div>`;
+  }
+  space._aiing = false;
+}
+
+async function saveNote() {
+  const t = ($("#noteText").value || "").trim();
+  if (!t && !space.notePics.length) { toast("写点什么或传张图吧"); return; }
+  // 直接读勾选状态（兼容程序化勾选未触发 onchange 的情况）
+  const privBox = $("#notePriv");
+  if (privBox && privBox.checked) space.notePriv = true;
+  if (space.notePriv && !space.priv.unlocked) { toast("请先解锁隐秘空间"); return; }
+  const aiOut = $("#noteAiOut").querySelector(".ai-cat");
+  try {
+    const imgs = [];
+    for (const d of space.notePics) imgs.push(await compressImg(d));
+    await post("/api/diary/save", {
+      date: todayStr(), kind: "note", text: t, photos: imgs,
+      is_private: space.notePriv ? 1 : 0,
+      category: aiOut ? aiOut.textContent : "",
+      summary: aiOut ? ($("#noteAiOut").textContent.split("💡")[0] || "").replace(aiOut.textContent, "").trim().slice(0, 100) : "",
+      advice: aiOut ? (($("#noteAiOut").textContent.match(/💡(.*)/) || [])[1] || "").trim() : "",
+    });
+    space.notePics = [];
+    $("#noteText").value = "";
+    $("#noteAiOut").innerHTML = "";
+    toast(space.notePriv ? "已存入隐秘空间 🔒" : "已保存 📝");
+    renderSpace();
+  } catch (e) { toast(e.message); }
+}
+
+async function saveWeight() {
+  const v = parseFloat(($("#wValue").value || "").trim());
+  if (!(v >= 20 && v <= 300)) { toast("体重需在 20-300 kg 之间"); return; }
+  try {
+    await post("/api/weight/save", { date: todayStr(), value: v });
+    toast("已记录 ⚖️");
+    renderSpace();
+  } catch (e) { toast(e.message); }
+}
+
+async function pickDate(ds) {
+  space.selDate = ds;
+  const dv = $("#dayView"); if (!dv) return;
+  try {
+    const d = await api("/api/diary/day?date=" + ds);
+    let html = `<div class="day-view" style="margin-top:10px"><div style="font-size:12px;color:#888;margin-bottom:6px">${esc(ds)}</div>`;
+    if (d.sign) html += dvItem(d.sign, "📷 签到", ds);
+    if (d.note) html += dvItem(d.note, "📝 随手记", ds);
+    if (d.weight) html += `<div class="dv-item"><span class="tl-tag">⚖️ 体重</span><div class="dv-txt">${d.weight.value} kg${d.weight.note ? " · " + esc(d.weight.note) : ""}</div>
+      <button class="dv-del" onclick="delWeight('${ds}')">删除</button></div>`;
+    if (!d.sign && !d.note && !d.weight) html += `<div class="tip">这一天还没有记录</div>`;
+    dv.innerHTML = html + `</div>`;
+  } catch (e) { toast(e.message); }
+}
+
+function dvItem(it, tag, ds) {
+  return `<div class="dv-item">
+    ${it.photos && it.photos[0] ? `<img src="${(it.is_private ? "/api/diary/private/photo?p=" : "/") + esc(it.photos[0])}" alt="">` : ""}
+    <div class="dv-txt">
+      <span class="tl-tag">${tag}${it.is_private ? " 🔒" : ""}</span>
+      ${it.locked ? `<div class="locked-note">🔒 隐秘内容，需高级密码</div>` : `<div>${esc(it.mood ? "【" + it.mood + "】" : "")}${esc(it.text || "")}</div>`}
+      ${it.category ? `<div class="dv-meta">分类：${esc(it.category)}${it.summary ? " · " + esc(it.summary) : ""}</div>` : ""}
+      <div class="dv-meta">${esc(it.created_at || "")}</div>
+    </div>
+    <button class="dv-del" onclick="delDiary(${it.id})">删除</button>
+  </div>`;
+}
+
+async function delDiary(id) {
+  if (!confirm("删除这条记录？")) return;
+  try { await post("/api/diary/delete", { id }); toast("已删除"); renderSpace(); } catch (e) { toast(e.message); }
+}
+async function delWeight(ds) {
+  if (!confirm("删除这天的体重记录？")) return;
+  try { await post("/api/weight/delete", { date: ds }); toast("已删除"); renderSpace(); } catch (e) { toast(e.message); }
+}
+
+async function setMonth(delta) {
+  const [y, m] = (space.month || todayStr().slice(0, 7)).split("-").map(Number);
+  const d = new Date(y, m - 1 + delta, 1);
+  space.month = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  renderSpace();
+}
+
+// ---------- 用户设置 ----------
+function openSettings() {
+  const p = space.profile || {};
+  const av = p.avatar || "";
+  const mask = document.createElement("div");
+  mask.className = "modal-mask";
+  mask.innerHTML = `<div class="modal" onclick="event.stopPropagation()">
+    <h3>👤 个人设置</h3>
+    <div class="row"><label>头像</label>
+      <div class="av-up">
+        ${av ? `<img id="setAv" src="/${esc(av)}" alt="">` : `<div class="space-avatar" id="setAv">${esc(String(me && (me.nickname || me.name) || "我").slice(0, 1))}</div>`}
+        <button class="btn ghost" style="width:auto;padding:8px 14px;" id="avUp">上传头像</button>
+        <input type="file" id="avFile" accept="image/*" style="display:none">
+      </div>
+    </div>
+    <div class="row"><label>昵称</label><input id="setName" class="input" maxlength="12" value="${esc(p.nickname || (me && me.name) || "")}"></div>
+    <div class="row"><label>生日</label><input id="setBirth" class="input" type="date" value="${esc(p.birthday || "")}"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="setCancel">取消</button>
+      <button class="btn primary" id="setSave">保存</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mask);
+  $("#setCancel").onclick = () => mask.remove();
+  mask.onclick = () => mask.remove();
+  const af = $("#avFile");
+  $("#avUp").onclick = () => af.click();
+  af.onchange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const d = await fileToDataURL(f);
+    if (!d.startsWith("data:image/")) { toast("请选择图片"); return; }
+    try {
+      const img = await compressImg(d, 512);
+      const r = await post("/api/profile/avatar", { data: img });
+      toast("头像已更新");
+      mask.remove();
+      renderSpace();
+    } catch (err) { toast(err.message); }
+  };
+  $("#setSave").onclick = async () => {
+    try {
+      await post("/api/profile/save", {
+        nickname: ($("#setName").value || "").trim(),
+        birthday: ($("#setBirth").value || "").trim(),
+      });
+      toast("已保存");
+      mask.remove();
+      renderSpace();
+    } catch (err) { toast(err.message); }
+  };
+}
+
+function openPrivChange() {
+  const mask = document.createElement("div");
+  mask.className = "modal-mask";
+  mask.innerHTML = `<div class="modal" onclick="event.stopPropagation()">
+    <h3>🔒 修改高级密码</h3>
+    <div class="row"><label>旧密码</label><input id="pcOld" class="input" type="password"></div>
+    <div class="row"><label>新密码（至少4位）</label><input id="pcNew" class="input" type="password"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="pcCancel">取消</button>
+      <button class="btn primary" id="pcSave">修改</button>
+    </div>
+  </div>`;
+  document.body.appendChild(mask);
+  $("#pcCancel").onclick = () => mask.remove();
+  mask.onclick = () => mask.remove();
+  $("#pcSave").onclick = async () => {
+    try {
+      await post("/api/diary/private/config", {
+        old_pwd: $("#pcOld").value,
+        new_pwd: $("#pcNew").value,
+      });
+      toast("密码已修改");
+      mask.remove();
+      renderSpace();
+    } catch (e) { toast(e.message); }
+  };
+}
