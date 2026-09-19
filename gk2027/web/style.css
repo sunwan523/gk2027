@@ -96,7 +96,7 @@ button { font-family:inherit; }
 .deck-progress .bar > div { background:#4a90d9; height:8px; border-radius:6px; transition:width .3s; }
 .deck-progress span { font-size:11px; color:#888; white-space:nowrap; }
 .deck-body {
-  padding:18px 14px; height:calc(100vh - 215px); min-height:300px; max-height:540px;
+  padding:18px 14px; height:calc(100vh - 234px); min-height:320px; max-height:720px;
   background:linear-gradient(135deg,#f3f9ef,#e7f3e0); border:1px solid #cfe2c4; border-radius:12px;
   margin-bottom:8px; font-size:18px; line-height:1.9; color:#1a1b1c; text-align:left;
   overflow-y:auto; -webkit-overflow-scrolling:touch; box-sizing:border-box;
