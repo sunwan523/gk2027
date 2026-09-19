@@ -3,8 +3,11 @@
 .help-btn { width:100%; padding:10px 4px; font-size:14px; border:none; background:#4a90d9; color:#fff; border-radius:8px; cursor:pointer; font-weight:600; }
 .help-btn:active { opacity:.85; }
 .help-btn.mini { width:auto; padding:5px 11px; font-size:12px; border-radius:14px; flex-shrink:0; font-weight:600; }
-.deck-body { touch-action:pan-y; cursor:grab; user-select:text; -webkit-user-select:text; }
+.deck-body { touch-action:pan-y; cursor:grab; user-select:text; -webkit-user-select:text; position:relative; }
 .deck-body:active { cursor:grabbing; }
+.deck-tap { position:absolute; top:0; bottom:0; width:30%; cursor:pointer; -webkit-tap-highlight-color:transparent; }
+.deck-tap.left { left:0; }
+.deck-tap.right { right:0; }
 .ai-explain { background:#fffdf5; border:1px solid #f0e2b8; border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.8; margin-bottom:8px; }
 .ae-head { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:6px; font-size:13px; flex-wrap:wrap; }
 .ae-speak { background:#fff; border:1px solid #f0e2b8; border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; }

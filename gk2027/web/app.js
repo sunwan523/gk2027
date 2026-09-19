@@ -435,8 +435,11 @@ function renderDeck(points) {
       <span>${i + 1}/${points.length}</span>
       <button class="help-btn ai mini" id="helpAi" title="这句没懂？让 AI 讲懂">🧑🏫 AI</button>
     </div>
-    <div class="deck-body" id="deckBody">${esc(points[i])}</div>
-    <div class="cap" style="margin:2px 0 6px;">左右滑动切换卡片 · 朗读可自动翻页</div>
+    <div class="deck-body" id="deckBody">
+      ${esc(points[i])}
+      <div class="deck-tap left" id="deckTapL" title="上一张"></div>
+      <div class="deck-tap right" id="deckTapR" title="下一张"></div>
+    </div>
     <div id="aiExplainBox"></div>
     <div class="tts-bar">
       <div class="tts-row">
@@ -468,6 +471,11 @@ function bindDeck(points) {
       if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); }
     });
   };
+  // 左右边缘点击翻页
+  const tl = $("#deckTapL"), tr = $("#deckTapR");
+  if (tl) tl.onclick = (e) => { e.stopPropagation(); ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); };
+  if (tr) tr.onclick = (e) => { e.stopPropagation(); ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); };
+
   // 左右滑动切换卡片
   const body = $("#deckBody");
   if (body) {
