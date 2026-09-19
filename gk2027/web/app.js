@@ -433,23 +433,20 @@ function renderDeck(points) {
     <div class="deck-progress">
       <div class="bar"><div style="width:${Math.round((i + 1) / points.length * 100)}%"></div></div>
       <span>${i + 1}/${points.length}</span>
+      <button class="help-btn ai mini" id="helpAi" title="这句没懂？让 AI 讲懂">🤖 讲懂</button>
     </div>
-    <div class="deck-body">${esc(points[i])}</div>
-    <div class="deck-help">
-      <button class="help-btn ai" id="helpAi">🤖 这句没懂？AI 讲懂</button>
-    </div>
+    <div class="deck-body" id="deckBody">${esc(points[i])}</div>
+    <div class="cap" style="margin:2px 0 6px;">左右滑动切换卡片 · 朗读可自动翻页</div>
     <div id="aiExplainBox"></div>
     <div class="tts-bar">
       <div class="tts-row">
-        <button class="tts-mini" id="deckPrev">⏮ 上一条</button>
+        <button class="tts-mini" id="deckPrev" title="上一条">⏮</button>
         <button class="tts-play" id="ttsPlay">▶️ 朗读</button>
-        <button class="tts-mini" id="deckNext">⏭ 下一条</button>
-        <button class="tts-mini" id="deckAuto">${deck.auto ? "🔁 自动翻页开" : "⏹ 自动翻页关"}</button>
-      </div>
-      <div class="tts-opt">
-        <span>语速</span>
+        <button class="tts-mini" id="deckNext" title="下一条">⏭</button>
+        <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
+        <span class="tts-spd" title="语速">语速</span>
         <input type="range" id="ttsRate" min="0.6" max="1.6" step="0.1" value="${tts.rate}">
-        <select id="ttsVoice"></select>
+        <select id="ttsVoice" title="朗读声音"></select>
       </div>
     </div>`;
   ttsLoadVoices();
@@ -459,7 +456,7 @@ function renderDeck(points) {
 function bindDeck(points) {
   $("#deckPrev").onclick = () => { ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); };
   $("#deckNext").onclick = () => { ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); };
-  $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁 自动翻页开" : "⏹ 自动翻页关"; };
+  $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
   $("#ttsRate").oninput = (e) => { tts.rate = parseFloat(e.target.value); localStorage.setItem("tts_rate", String(tts.rate)); };
   $("#ttsVoice").onchange = (e) => {
     const v = tts.voices[parseInt(e.target.value)];
@@ -471,6 +468,22 @@ function bindDeck(points) {
       if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); }
     });
   };
+  // 左右滑动切换卡片
+  const body = $("#deckBody");
+  if (body) {
+    let sx = 0, sy = 0, tracking = false;
+    body.addEventListener("pointerdown", (e) => { tracking = true; sx = e.clientX; sy = e.clientY; }, { passive: true });
+    body.addEventListener("pointerup", (e) => {
+      if (!tracking) return;
+      tracking = false;
+      const dx = e.clientX - sx, dy = e.clientY - sy;
+      if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+        if (dx < 0) { ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); }
+        else { ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); }
+      }
+    }, { passive: true });
+    body.addEventListener("pointercancel", () => { tracking = false; });
+  }
   // 遇到不懂的：AI 讲懂
   const curText = () => points[deck.idx] || "";
   $("#helpAi").onclick = async () => {
