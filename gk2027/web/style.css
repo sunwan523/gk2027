@@ -102,24 +102,24 @@ button { font-family:inherit; }
 }
 .tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
 .tts-row { display:flex; align-items:center; gap:8px; flex-wrap:nowrap; position:relative; }
-.tts-side { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1; min-width:0; }
-.tts-side.tts-right { justify-content:center; flex-direction:column; gap:6px; align-items:flex-end; margin-right:-4px; }
-.deck-player { position:fixed; right:10px; bottom:72px; z-index:46; background:#fff; border:1px solid #e4e8f2; border-radius:16px; padding:8px 6px 8px 12px; box-shadow:0 4px 16px rgba(31,58,147,.12); }
+.tts-side { display:flex; align-items:center; justify-content:flex-end; gap:6px; flex:none; min-width:0; flex-direction:column; }
+.tts-side.tts-right { justify-content:center; gap:6px; align-items:flex-end; margin-right:-2px; }
+.deck-player { position:fixed; right:10px; bottom:74px; z-index:46; background:#fff; border:1px solid #e4e8f2; border-radius:16px; padding:8px 6px 8px 8px; box-shadow:0 4px 16px rgba(31,58,147,.12); }
 .deck-player .tts-pop { bottom:calc(100% + 8px); }
-.deck-cta { position:fixed; left:12px; bottom:84px; z-index:46; }
-.deck-cta #toQuiz { padding:9px 18px; font-size:14px; background:#eef5ff; color:#3a7bd5; border:1px solid #cfe2ff; border-radius:12px; box-shadow:0 2px 8px rgba(58,123,213,.15); }
-#deckWrap { padding-bottom:150px; }
+.deck-cta { position:fixed; left:10px; bottom:78px; z-index:46; }
+.deck-cta #toQuiz { padding:8px 14px; font-size:13px; background:#eef5ff; color:#3a7bd5; border:1px solid #cfe2ff; border-radius:12px; box-shadow:0 2px 8px rgba(58,123,213,.15); }
+#deckWrap { padding-bottom:170px; }
 .tts-pop { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:#fff; border:1px solid #dce4ff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.14); display:flex; gap:4px; padding:5px; z-index:60; }
 .tts-pop[hidden] { display:none; }
 .tts-pop button { border:none; background:#f0f4ff; border-radius:9px; padding:8px 16px; font-size:14px; font-weight:600; color:#333; cursor:pointer; }
 .tts-pop button:active { background:#dce8ff; }
 .tts-btn { border:1px solid #cfe2ff; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
-.tts-play { border:none; background:transparent; color:#5b7cfa; width:44px; height:44px; cursor:pointer; font-size:24px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+.tts-play { border:none; background:transparent; color:#5b7cfa; width:42px; height:42px; cursor:pointer; font-size:22px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .tts-play:active { background:#eef1f8; }
-.tts-mini { border:none; background:#eef1f8; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.tts-turn { border:none; background:#eef1f8; color:#4a6bb3; border-radius:14px; padding:0 12px; height:34px; cursor:pointer; font-size:13px; font-weight:600; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.tts-mini { border:none; background:#eef1f8; border-radius:50%; width:32px; height:32px; cursor:pointer; font-size:14px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.tts-turn { border:none; background:#eef1f8; color:#4a6bb3; border-radius:14px; padding:0 10px; height:34px; cursor:pointer; font-size:12px; font-weight:600; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .tts-turn:active { opacity:.7; }
-.tts-spd { font-size:12px; color:#666; flex-shrink:0; white-space:nowrap; border:none; background:none; padding:6px 4px; cursor:pointer; }
+.tts-spd { font-size:11px; color:#666; flex-shrink:0; white-space:nowrap; border:none; background:none; padding:4px 2px; cursor:pointer; }
 .tts-row input[type=range] { width:60px; flex-shrink:1; min-width:36px; }
 .tts-rate { font-size:13px; padding:4px 8px; border:1px solid #cfe2ff; border-radius:8px; background:#fff; color:#333; flex-shrink:0; cursor:pointer; }
 .voice-list { max-height:190px; overflow-y:auto; display:flex; flex-direction:column; gap:4px; padding:6px 8px; border:1px solid #e2e5ee; border-radius:10px; background:#fafbfd; }

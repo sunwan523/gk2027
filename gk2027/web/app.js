@@ -573,7 +573,7 @@ function renderDeck(points) {
       <div class="tts-row">
         <span class="tts-side">
           <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
-          <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
+          <button class="tts-spd" id="ttsRateBtn" title="语速">语速▾</button>
         </span>
         <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶</button>
         <span class="tts-side tts-right">
