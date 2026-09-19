@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import sys
 from datetime import date, timedelta
+import time
 
 import streamlit as st
 import streamlit.components.v1 as components
@@ -122,6 +123,36 @@ def header_bar():
 """ % (uname, stt["streak"], mastered or 0, total,
        stt["xp_today"], stt["xp_goal"], goal, ratio),
         unsafe_allow_html=True)
+
+
+# ----------------------------------------------------------------------
+# 埋点：页面停留时长结算 + 30 秒心跳（防挂机虚增，单条上限 5 分钟）
+# ----------------------------------------------------------------------
+def _settle_activity():
+    """每次 rerun 结算"上次到现在的秒数"写入 activity_log（上限 5 分钟/条）。"""
+    now = time.time()
+    try:
+        c = conn()
+    except Exception:
+        return
+    last_ts = st.session_state.get("act_ts")
+    if last_ts is not None:
+        elapsed = int(now - last_ts)
+        if 1 <= elapsed <= db.MAX_ACTIVITY_SECONDS:
+            db.add_activity(c, date.today().isoformat(),
+                            page=st.session_state.get("act_page", "浏览"),
+                            subject=st.session_state.get("act_subject", ""),
+                            kp_id=st.session_state.get("act_kp", ""),
+                            seconds=elapsed,
+                            hour=time.localtime(now).tm_hour)
+    st.session_state.act_ts = now
+
+
+def _mark_activity(page: str, subject: str = "", kp_id: str = ""):
+    """记录当前所在页面场景，供下一次结算使用。"""
+    st.session_state.act_page = page
+    st.session_state.act_subject = subject or ""
+    st.session_state.act_kp = kp_id or ""
 
 
 # ----------------------------------------------------------------------
@@ -533,10 +564,12 @@ def open_lesson(kp_id: str, name: str):
         st.warning("该知识点暂无自检题。")
         return
     pts = content.get_content(kp_id)
+    row = c.execute("SELECT subject FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
     st.session_state.lesson = {"kp_id": kp_id, "name": name, "qs": qs,
                                "idx": 0, "phase": "learn", "results": [],
                                "last_correct": False, "points": pts,
-                               "card_idx": 0}
+                               "card_idx": 0,
+                               "subject": row["subject"] if row else "数学"}
 
 
 ICON = {"可学": "▶️", "学习中": "🔶", "需复习": "🔁", "已掌握": "✅", "未解锁": "🔒"}
@@ -545,8 +578,14 @@ ICON = {"可学": "▶️", "学习中": "🔶", "需复习": "🔁", "已掌握
 def page_learn():
     c = conn()
     if st.session_state.get("lesson"):
+        L = st.session_state.lesson
+        if L["phase"] == "learn":
+            _mark_activity("学习", L.get("subject", ""), L["kp_id"])
+        else:
+            _mark_activity("练习", L.get("subject", ""), L["kp_id"])
         render_lesson()
         return
+    _mark_activity("浏览")
     subj = st.radio("科目", ["全部"] + SUBJECTS, horizontal=True,
                     label_visibility="collapsed")
     s = None if subj == "全部" else subj
@@ -594,6 +633,7 @@ def page_learn():
 # ----------------------------------------------------------------------
 def page_review():
     c = conn()
+    _mark_activity("复习")
     cards = queue.due_reviews(c)
     if not cards:
         st.success("🎉 今日没有到期的复习卡片。")
@@ -632,6 +672,7 @@ def page_review():
 # ----------------------------------------------------------------------
 def page_progress():
     c = conn()
+    _mark_activity("进度")
     tree = queue.lesson_tree(c)
     total_m = sum(t["mastered"] for t in tree)
     total_n = sum(t["total"] for t in tree)
@@ -664,6 +705,133 @@ def page_progress():
 
 
 # ----------------------------------------------------------------------
+# 统计：学习时长 / 掌握情况 / AI 建议
+# ----------------------------------------------------------------------
+def page_stats():
+    c = conn()
+    _mark_activity("统计")
+    st.subheader("📊 学习统计")
+    today = date.today()
+    week_start = (today - timedelta(days=today.weekday())).isoformat()
+    today_s = today.isoformat()
+
+    def secs_since(d: str | None) -> int:
+        if d:
+            return int(c.execute("SELECT COALESCE(SUM(seconds),0) FROM activity_log WHERE day>=?", (d,)).fetchone()[0])
+        return int(c.execute("SELECT COALESCE(SUM(seconds),0) FROM activity_log").fetchone()[0])
+
+    # ---- 使用时间 ----
+    st.markdown("#### ⏱ 使用时间")
+    m1, m2, m3 = st.columns(3)
+    m1.metric("今日", "%d 分" % round(secs_since(today_s) / 60))
+    m2.metric("本周", "%d 分" % round(secs_since(week_start) / 60))
+    m3.metric("累计", "%d 分" % round(secs_since(None) / 60))
+
+    days14 = [(today - timedelta(days=k)).isoformat() for k in range(13, -1, -1)]
+    per_day = {}
+    for r in c.execute("SELECT day, SUM(seconds) s FROM activity_log WHERE day>=? GROUP BY day",
+                       (days14[0],)):
+        per_day[r["day"]] = round((r["s"] or 0) / 60, 1)
+    st.caption("每日学习分钟（近 14 天）")
+    st.line_chart({d[5:]: per_day.get(d, 0) for d in days14})
+
+    subj_secs = {}
+    for r in c.execute("SELECT subject, SUM(seconds) s FROM activity_log WHERE day>=? GROUP BY subject",
+                       (days14[0],)):
+        subj_secs[r["subject"] or "其他"] = round((r["s"] or 0) / 60, 1)
+    if subj_secs:
+        st.caption("各科学习分钟（近 14 天）")
+        st.bar_chart(subj_secs)
+
+    # ---- 掌握情况 ----
+    st.markdown("#### 🎯 掌握情况")
+    rows = c.execute(
+        "SELECT subject, SUM(status='已掌握') m, COUNT(*) n FROM knowledge_points"
+        " WHERE id NOT IN ('eng_vocab','chn_dictation') GROUP BY subject ORDER BY subject").fetchall()
+    if rows:
+        labels = [r["subject"] for r in rows]
+        values = [round(r["m"] * 100 / max(1, r["n"])) for r in rows]
+        st.markdown("**各科掌握率**")
+        st.bar_chart({r["subject"]: round(r["m"] * 100 / max(1, r["n"])) for r in rows})
+        st.caption("  ".join("%s %d%%" % (l, v) for l, v in zip(labels, values)))
+
+    weak = c.execute(
+        "SELECT subject, name, status, ROUND(mastery*100) m FROM knowledge_points"
+        " WHERE status NOT IN ('已掌握','未解锁') AND id NOT IN ('eng_vocab','chn_dictation')"
+        " ORDER BY subject, mastery LIMIT 40").fetchall()
+    if weak:
+        st.markdown("**未掌握知识点**（%d 个，按掌握度升序）" % len(weak))
+        for r in weak:
+            st.markdown("• %s · %s · %s · %d%%" % (r["subject"], r["name"], r["status"], r["m"]))
+
+    attrs = c.execute(
+        "SELECT attribution, COUNT(*) n FROM wrong_questions WHERE resolved=0"
+        " GROUP BY attribution ORDER BY n DESC").fetchall()
+    if attrs:
+        st.markdown("**未解决错题归因**（决定下一步怎么练）")
+        st.bar_chart({r["attribution"]: r["n"] for r in attrs})
+
+    att = c.execute(
+        "SELECT date(done_at) d, COUNT(*) n, SUM(correct) ok FROM attempts"
+        " WHERE done_at>=date('now','-13 days') GROUP BY d ORDER BY d").fetchall()
+    if att:
+        st.caption("每日做题正确率（近 14 天，%）")
+        st.line_chart({r["d"][5:]: round((r["ok"] or 0) * 100 / max(1, r["n"])) for r in att})
+        total_ok = c.execute("SELECT SUM(correct) FROM attempts").fetchone()[0] or 0
+        total_n = c.execute("SELECT COUNT(*) FROM attempts").fetchone()[0] or 0
+        st.caption("累计作答 %d 题，总正确率 %d%%" % (total_n, round(total_ok * 100 / max(1, total_n))))
+
+    # ---- 总进度（原进度页内容） ----
+    st.markdown("#### 📈 总进度")
+    tree = queue.lesson_tree(c)
+    total_m = sum(t["mastered"] for t in tree)
+    total_n = sum(t["total"] for t in tree)
+    st.progress(total_m / max(1, total_n))
+    st.caption("一轮总进度 %d / %d 知识点已掌握" % (total_m, total_n))
+    for t in tree:
+        with st.expander("%s %d/%d" % (t["subject"], t["mastered"], t["total"]), expanded=False):
+            for it in t["items"]:
+                if it["status"] == "已掌握":
+                    mark = "✅"
+                elif it["status"] == "未解锁":
+                    mark = "🔒"
+                else:
+                    mark = "🔶" if it["status"] in ("学习中", "需复习") else "▶️"
+                extra = "" if it["has_quiz"] else "（自检题待补）"
+                st.markdown("%s %s %d%%%s" % (mark, it["name"], it["mastery"], extra))
+
+    st.divider()
+    st.subheader("近 14 天 XP")
+    log = db.get_setting(c, "xp_log", {}) or {}
+    days14x = [(date.today() - timedelta(days=k)).isoformat() for k in range(13, -1, -1)]
+    st.bar_chart({d[5:]: log.get(d, 0) for d in days14x})
+
+    # ---- AI 建议 ----
+    st.divider()
+    st.markdown("#### 🤖 AI 学习建议")
+    st.caption("只发送你的学习统计汇总（不含姓名/账号等身份信息），由 DeepSeek 分析。AI 建议仅供参考。")
+    if st.button("生成 AI 学习建议", type="primary", use_container_width=True):
+        with st.spinner("DeepSeek 正在分析你的学习数据…"):
+            try:
+                from core import study_advisor
+                summary = study_advisor.build_summary(c)
+                st.session_state.ai_advice = study_advisor.get_advice(summary)
+            except Exception as e:
+                st.error("AI 建议生成失败：%s" % str(e)[:200])
+                st.session_state.pop("ai_advice", None)
+    if st.session_state.get("ai_advice"):
+        st.markdown(st.session_state.ai_advice)
+        st.caption("—— AI 建议仅供参考，请结合自身情况判断 ——")
+
+    st.divider()
+    if st.button("🔄 切换用户 / 退出", use_container_width=True):
+        st.session_state.pop("uid", None)
+        st.session_state.lesson = None
+        st.session_state.pop("act_ts", None)
+        st.rerun()
+
+
+# ----------------------------------------------------------------------
 # 导出：每日学习单 / 总复习文档 PDF（手机生成→发送到电脑/手机直接打印）
 # ----------------------------------------------------------------------
 def page_export():
@@ -671,6 +839,7 @@ def page_export():
     from datetime import date as _date
     from core import daily as dy, pdf, content as content_mod
     c = conn()
+    _mark_activity("导出")
     content_mod.reload_content()   # 内容文件有更新时立即生效
     st.caption("生成的 PDF 可发送到电脑打印，或手机连打印机直接打。"
                "每日学习单＝按你当前进度排（已掌握的自动跳过，不重复）；"
@@ -739,6 +908,7 @@ def page_recite():
     cat_names = [c[1] for c in cats]
     cat_idx = col_c.radio("分类", cat_names, horizontal=True, label_visibility="collapsed")
     kp_id = cats[cat_names.index(cat_idx)][0]
+    _mark_activity("背诵", subject, kp_id)
 
     pts = content_mod.get_content(kp_id) or []
     if not pts:
@@ -811,14 +981,17 @@ if _current_user() is None:
     login_page()
 
 header_bar()
-tab1, tab2, tab3, tab4, tab5 = st.tabs(["📚 学", "🔁 复习", "📈 进度", "📄 导出", "📖 背诵"])
-with tab1:
+_settle_activity()
+NAV_PAGES = ["📚 学", "🔁 复习", "📊 统计", "📄 导出", "📖 背诵"]
+nav = st.radio("页面", NAV_PAGES, horizontal=True,
+               label_visibility="collapsed", key="nav_main")
+if nav == "📚 学":
     page_learn()
-with tab2:
+elif nav == "🔁 复习":
     page_review()
-with tab3:
-    page_progress()
-with tab4:
+elif nav == "📊 统计":
+    page_stats()
+elif nav == "📄 导出":
     page_export()
-with tab5:
+else:
     page_recite()

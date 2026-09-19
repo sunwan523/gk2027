@@ -24,7 +24,7 @@ PID_FILE = os.path.join(BASE, "data", "mobile.pid")
 LOG_FILE = os.path.join(BASE, "logs", "mobile.log")
 PY = sys.executable.replace("pythonw.exe", "python.exe")
 PYW = os.path.join(os.path.dirname(PY), "pythonw.exe")
-APP = os.path.join(BASE, "mobile.py")
+APP = "server:app"
 
 DETACHED = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
 
@@ -48,7 +48,7 @@ def _read_pid() -> int | None:
 
 def _health() -> bool:
     try:
-        r = urllib.request.urlopen("http://localhost:%d/_stcore/health" % PORT,
+        r = urllib.request.urlopen("http://localhost:%d/api/me" % PORT,
                                    timeout=2)
         return r.status == 200
     except Exception:
@@ -79,11 +79,13 @@ def cmd_start() -> int:
     os.makedirs(os.path.dirname(PID_FILE), exist_ok=True)
     os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
     log = open(LOG_FILE, "ab")
+    env = dict(os.environ)
+    vendor = os.path.join(BASE, "_vendor")
+    env["PYTHONPATH"] = vendor + os.pathsep + env.get("PYTHONPATH", "")
     proc = subprocess.Popen(
-        [PY, "-m", "streamlit", "run", APP,
-         "--server.address", "0.0.0.0", "--server.port", str(PORT),
-         "--server.headless", "true", "--browser.gatherUsageStats", "false"],
-        stdout=log, stderr=log, cwd=BASE, creationflags=DETACHED,
+        [PY, "-m", "uvicorn", APP,
+         "--host", "0.0.0.0", "--port", str(PORT)],
+        stdout=log, stderr=log, cwd=BASE, env=env, creationflags=DETACHED,
         close_fds=True)
     open(PID_FILE, "w").write(str(proc.pid))
     for _ in range(30):

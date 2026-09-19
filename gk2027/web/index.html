@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>高考复习</title>
+<link rel="stylesheet" href="/web/style.css">
+</head>
+<body>
+
+<!-- 登录页 -->
+<div id="loginPage" class="page hidden">
+  <div class="login-box">
+    <h2>👋 你是谁？</h2>
+    <div id="loginUsers"></div>
+    <div class="login-divider">—— 或新同学 ——</div>
+    <input id="newName" type="text" placeholder="名字（如：小明）" maxlength="12">
+    <button id="loginBtn" class="primary" disabled>✨ 开始使用</button>
+    <p class="tip">每个人的进度、错题、复习卡片独立保存，互不影响。</p>
+  </div>
+</div>
+
+<!-- 主界面 -->
+<div id="mainPage" class="hidden">
+  <div id="headerBar" class="header"></div>
+
+  <div id="tabLearn" class="page tab-page"></div>
+  <div id="tabReview" class="page tab-page hidden"></div>
+  <div id="tabStats" class="page tab-page hidden"></div>
+  <div id="tabRecite" class="page tab-page hidden"></div>
+  <div id="tabExport" class="page tab-page hidden"></div>
+
+  <nav id="navBar" class="nav">
+    <button data-tab="tabLearn" class="nav-btn active">📚 学</button>
+    <button data-tab="tabReview" class="nav-btn">🔁 复习</button>
+    <button data-tab="tabStats" class="nav-btn">📊 统计</button>
+    <button data-tab="tabRecite" class="nav-btn">📖 背诵</button>
+    <button data-tab="tabExport" class="nav-btn">📄 导出</button>
+  </nav>
+</div>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="/web/app.js"></script>
+</body>
+</html>

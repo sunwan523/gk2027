@@ -158,6 +158,17 @@ CREATE TABLE IF NOT EXISTS exam_records (
     detail       TEXT DEFAULT ''
 );
 
+-- ---------------------------------------------------------------- 学习时长
+CREATE TABLE IF NOT EXISTS activity_log (
+    day       TEXT NOT NULL,
+    hour      INTEGER NOT NULL DEFAULT 0,
+    page      TEXT NOT NULL,
+    subject   TEXT NOT NULL DEFAULT '',
+    kp_id     TEXT NOT NULL DEFAULT '',
+    seconds   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (day, hour, page, subject, kp_id)
+);
+
 -- ---------------------------------------------------------------- 设置
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -447,3 +458,43 @@ def question_stats_by_subject(conn: sqlite3.Connection) -> list[dict[str, Any]]:
 
 def now_str() -> str:
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+# ----------------------------------------------------------------------
+# 学习时长统计
+# ----------------------------------------------------------------------
+MAX_ACTIVITY_SECONDS = 300   # 单条时长上限5分钟，防挂机虚增
+
+
+def add_activity(conn: sqlite3.Connection, day: str, page: str,
+                 subject: str = "", kp_id: str = "", seconds: int = 1,
+                 hour: int = 0) -> None:
+    """累计一次学习时长（按 天×小时×页面×科目×知识点 聚合，可重复调用累加）。
+
+    page 取值：学习 / 练习 / 背诵 / 复习 / 进度 / 导出 / 统计 / 浏览
+    seconds 单条上限 5 分钟，避免页面挂着不动虚增时长。
+    """
+    seconds = max(0, min(int(seconds), MAX_ACTIVITY_SECONDS))
+    if seconds <= 0:
+        return
+    conn.execute(
+        "INSERT INTO activity_log(day, hour, page, subject, kp_id, seconds)"
+        " VALUES(?,?,?,?,?,?)"
+        " ON CONFLICT(day, hour, page, subject, kp_id)"
+        " DO UPDATE SET seconds = seconds + excluded.seconds",
+        (day, hour % 24, page, subject or "", kp_id or "", seconds),
+    )
+    conn.commit()
+
+
+def activity_totals(conn: sqlite3.Connection, since: str | None = None,
+                    page: str | None = None) -> list[sqlite3.Row]:
+    """聚合时长。since 为 YYYY-MM-DD 起始日期（含）；page 过滤页面类型。"""
+    sql = "SELECT day, page, subject, kp_id, seconds FROM activity_log WHERE 1=1"
+    args: list[Any] = []
+    if since:
+        sql += " AND day >= ?"; args.append(since)
+    if page:
+        sql += " AND page = ?"; args.append(page)
+    sql += " ORDER BY day, page, subject, kp_id"
+    return conn.execute(sql, args).fetchall()
