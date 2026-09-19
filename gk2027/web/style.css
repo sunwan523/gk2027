@@ -96,7 +96,7 @@ button { font-family:inherit; }
 .deck-progress .bar > div { background:#4a90d9; height:8px; border-radius:6px; transition:width .3s; }
 .deck-progress span { font-size:11px; color:#888; white-space:nowrap; }
 .deck-body {
-  padding:18px 14px; height:calc(100vh - 234px); min-height:320px; max-height:720px;
+  padding:18px 14px; height:auto; min-height:0; max-height:none;
   background:linear-gradient(135deg,#f3f9ef,#e7f3e0); border:1px solid #cfe2c4; border-radius:12px;
   margin-bottom:8px; font-size:18px; line-height:1.9; color:#1a1b1c; text-align:left;
   overflow-y:auto; -webkit-overflow-scrolling:touch; box-sizing:border-box;
@@ -110,6 +110,11 @@ button { font-family:inherit; }
 .deck-cta { position:fixed; left:10px; bottom:78px; z-index:46; }
 .deck-cta #toQuiz { padding:8px 14px; font-size:13px; background:#eef5ff; color:#3a7bd5; border:1px solid #cfe2ff; border-radius:12px; box-shadow:0 2px 8px rgba(58,123,213,.15); }
 #deckWrap { padding-bottom:170px; }
+#tabLearn.learn-layout { height:100vh; height:100dvh; display:flex; flex-direction:column; overflow:hidden; padding-bottom:0; box-sizing:border-box; }
+#tabLearn.learn-layout .learn-top { flex:none; }
+#tabLearn.learn-layout #aiExplainBox { flex:none; }
+#tabLearn.learn-layout #deckWrap { flex:1; min-height:0; display:flex; flex-direction:column; padding-bottom:172px; box-sizing:border-box; }
+#tabLearn.learn-layout .deck-body { flex:1; min-height:0; max-height:none; height:auto; }
 .tts-pop { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:#fff; border:1px solid #dce4ff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.14); display:flex; gap:4px; padding:5px; z-index:60; }
 .tts-pop[hidden] { display:none; }
 .tts-pop button { border:none; background:#f0f4ff; border-radius:9px; padding:8px 16px; font-size:14px; font-weight:600; color:#333; cursor:pointer; }

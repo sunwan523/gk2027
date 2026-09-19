@@ -279,6 +279,7 @@ async function renderLearn() {
   if (lesson) { renderLesson(); return; }
   if (aiQuiz) { renderAiQuiz(); return; }
   const el = $("#tabLearn");
+  el.classList.remove("learn-layout");
   el.innerHTML = `<div class="subj-filter">${["全部", ...SUBJECTS].map(s =>
     `<button class="${s === learnSubj ? "active" : ""}" data-s="${s}">${s}</button>`).join("")}</div>` +
     `<div id="lessonList"><div class="spinner">加载中…</div></div>`;
@@ -395,8 +396,10 @@ function renderLesson() {
   saveProgress();
   const L = lesson;
   const el = $("#tabLearn");
+  el.classList.remove("learn-layout");
   if (L.phase === "done") { renderLessonDone(L); return; }
   if (L.phase === "learn") {
+    el.classList.add("learn-layout");
     reportAct("学习", L.subject, L.kp_id);
     const hb = $("#headerBar"); if (hb) hb.style.display = "none";   // 学习页顶部全留给内容
     el.innerHTML = `
