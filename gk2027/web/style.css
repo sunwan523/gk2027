@@ -103,7 +103,7 @@ button { font-family:inherit; }
 .tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
 .tts-row { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; position:relative; }
 .tts-side { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1; min-width:0; }
-.tts-side.tts-right { justify-content:flex-start; flex-direction:column; gap:6px; align-items:flex-start; }
+.tts-side.tts-right { justify-content:center; flex-direction:column; gap:6px; align-items:flex-end; margin-right:-4px; }
 .tts-bar { position:relative; }
 .deck-cta { position:fixed; left:0; right:0; bottom:66px; max-width:720px; margin:0 auto; padding:0 12px; gap:10px; z-index:46; }
 #deckWrap { padding-bottom:96px; }
