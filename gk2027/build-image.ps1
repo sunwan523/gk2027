@@ -15,6 +15,7 @@ if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
 }
 
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
+Set-Location $root
 $fonts = Join-Path $root 'fonts'
 New-Item -ItemType Directory -Force -Path $fonts | Out-Null
 
