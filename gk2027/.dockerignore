@@ -13,3 +13,4 @@ fonts/msyh.ttc.bak
 tools
 *.ps1
 *.bat
+_vendor

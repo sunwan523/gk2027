@@ -5,7 +5,7 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
-# 项目代码（运行态目录由 .dockerignore 排除）
+# 项目代码（_vendor 里的 Windows 二进制由 .dockerignore 排除，依赖走 requirements.txt 装 Linux 版）
 COPY . /app
 
 # 中文字体目录（PDF 生成依赖，见 config.py 的 GK_FONT_DIR）
@@ -20,7 +20,6 @@ RUN mkdir -p /app/data /app/output /app/logs
 
 EXPOSE 8577
 
-# 手机端入口；电脑端（app.py）可另行指定入口
-CMD ["streamlit", "run", "mobile.py", \
-     "--server.address=0.0.0.0", "--server.port=8577", \
-     "--server.headless=true", "--browser.gatherUsageStats=false"]
+# FastAPI 入口（svc.py 是 Windows 服务管理，容器内直接用 uvicorn）
+CMD ["python", "-m", "uvicorn", "server:app", \
+     "--host", "0.0.0.0", "--port", "8577"]
