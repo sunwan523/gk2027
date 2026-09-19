@@ -193,15 +193,24 @@ async function renderLearn() {
       return;
     }
     if (!d.lessons.length) { list.innerHTML = `<div class="chart-card" style="text-align:center;color:#888;">暂无课程</div>`; return; }
-    list.innerHTML = d.lessons.map(l => `
-      <div class="lesson-card">
+    list.innerHTML = d.lessons.map(l => {
+      const cont = saved && saved.kp_id === l.kp_id &&
+        (saved.card_idx > 0 || saved.phase !== "learn" || saved.q_idx > 0 ||
+         (saved.results || []).length > 0);
+      return `<div class="lesson-card">
         <div class="lc-main">
           <div class="lc-name">${iconOf(l.status)} ${esc(l.subject)}·${esc(l.name)}</div>
           <div class="lc-sub">掌握度 ${l.mastery}%｜自检题 ${l.q_done}/${l.q_total}｜约 ${l.minutes} 分钟</div>
         </div>
-        <button class="lc-go" data-kp="${esc(l.kp_id)}">${(saved && saved.kp_id === l.kp_id) ? "继续 ▶" : "开始"}</button>
-      </div>`).join("");
+        <div class="lc-actions">
+          ${cont ? `<button class="lc-go" data-kp="${esc(l.kp_id)}">继续 ▶</button>
+          <button class="lc-restart" data-kp="${esc(l.kp_id)}">↺ 重学</button>`
+          : `<button class="lc-go" data-kp="${esc(l.kp_id)}">开始</button>`}
+        </div>
+      </div>`;
+    }).join("");
     list.querySelectorAll(".lc-go").forEach(b => b.onclick = () => startLesson(b.dataset.kp));
+    list.querySelectorAll(".lc-restart").forEach(b => b.onclick = () => restartLesson(b.dataset.kp));
     reportAct("学习", learnSubj === "全部" ? "" : learnSubj, "");
   } catch (e) {
     $("#lessonList").innerHTML = `<div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`;
@@ -212,6 +221,14 @@ function iconOf(status) {
 }
 
 // ---------- 开课 ----------
+function restartLesson(kpId) {
+  // 重新开始：只清本课的进度记录（其他课的快照不动）
+  const saved = loadProgress();
+  if (saved && saved.kp_id === kpId) clearProgress();
+  deck.idx = 0;
+  startLesson(kpId);
+}
+
 async function startLesson(kpId) {
   try {
     const d = await post("/api/lesson/start", { kp_id: kpId });
@@ -261,6 +278,7 @@ function exitToLearn() {
 }
 
 function renderLesson() {
+  saveProgress();
   const L = lesson;
   const el = $("#tabLearn");
   if (L.phase === "done") { renderLessonDone(L); return; }
@@ -426,6 +444,7 @@ function renderDeck(points) {
     </div>`;
   ttsLoadVoices();
   bindDeck(points);
+  saveProgress();
 }
 function bindDeck(points) {
   $("#deckPrev").onclick = () => { ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); };

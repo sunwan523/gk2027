@@ -1,3 +1,6 @@
+/* 课程卡片按钮区：继续 + 重学 */
+.lc-actions { display:flex; gap:6px; flex-shrink:0; }
+.lc-restart { padding:8px 12px; font-size:13px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#888; cursor:pointer; }
 .page-top { display:flex; margin-bottom:6px; }
 .back-btn { background:#fff; border:1px solid #ddd; border-radius:8px; padding:4px 12px; font-size:13px; color:#555; cursor:pointer; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
