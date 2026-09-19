@@ -833,20 +833,19 @@ async function renderSpace() {
   const av = (profile && profile.avatar) || (me && me.avatar) || "";
   const bd = (profile && profile.birthday) || "";
   el.innerHTML = `
-  <div class="page-top"><h3 style="font-size:18px;">📖 我的空间</h3></div>
-  <div class="space-user">
-    ${av ? `<div class="space-avatar"><img src="/${esc(av)}" alt=""></div>` : `<div class="space-avatar">${esc(String(nm).slice(0, 1) || "我")}</div>`}
-    <div>
-      <div class="su-name">${esc(nm || "同学")}</div>
-      <div class="su-sub">${bd ? "🎂 " + esc(bd) + " · " : ""}连续签到 <b>${month.streak}</b> 天 · 共 ${month.total_sign} 次</div>
-    </div>
-    <button class="su-edit" onclick="openSettings()">✏️ 设置</button>
+  <div class="qq-cover">
+    <div class="cover-deco d1"></div><div class="cover-deco d2"></div><div class="cover-deco d3"></div>
+    <div class="cover-ava">${av ? `<img src="/${esc(av)}" alt="">` : esc(String(nm).slice(0, 1) || "我")}</div>
+    <div class="cover-name">${esc(nm || "同学")}</div>
+    <div class="cover-sig">${bd ? "🎂 " + esc(bd) + " · " : ""}坚持复习，每天进步一点点</div>
+    <button class="cover-edit" onclick="openSettings()">✏️ 编辑资料</button>
+    <div class="cover-badge">🔥 连签 ${month.streak} 天</div>
   </div>
 
-  ${space.priv.unlocked ? `<div class="priv-card space-card"><h4>🔓 隐秘空间已解锁（30分钟内有效）</h4></div>` : ""}
+  ${space.priv.unlocked ? `<div class="priv-tip"><span>🔓</span> 隐秘空间已解锁（30分钟内有效）</div>` : ""}
+  ${renderWeightCard()}
   ${renderSignCard(today)}
   ${renderNoteCard()}
-  ${renderWeightCard()}
   <div class="space-card"><h4>📅 时间轴</h4>${renderCal(month, today)}</div>
   <div class="space-card">${renderPrivCard()}</div>
   <div class="space-card"><h4>🕰 全部记录</h4>${renderTimeline(list.items || [])}</div>
@@ -858,41 +857,45 @@ function renderSignCard(today) {
   const t = todayStr();
   if (today && today.sign) {
     const s = today.sign;
-    return `<div class="space-card">
-      <h4>📷 今日签到 ✓</h4>
-      <div class="sign-done">
-        ${s.photos && s.photos[0] ? `<img src="/${esc(s.photos[0])}" alt="签到照">` : ""}
-        <div class="sd-txt">
-          <div class="sd-badge">已签到 ${s.is_late ? "（补签）" : ""}</div>
-          ${esc(s.mood || "今天也坚持下来了 💪")}
+    return `<div class="space-card sign-card">
+      <div class="sign-row">
+        <div class="sign-cam done">
+          ${s.photos && s.photos[0] ? `<img src="/${esc(s.photos[0])}" alt="签到照">` : `<span class="cam-ico">📷</span>`}
+          <div class="cam-hint">今日已签</div>
+        </div>
+        <div class="sign-main">
+          <div class="sign-title">📷 今日签到 <span class="sd-badge">✓ ${s.is_late ? "补签" : "完成"}</span></div>
+          <div class="sign-mood-txt">${esc(s.mood || "今天也坚持下来了 💪")}</div>
           <div class="dv-meta">${esc((s.created_at || "").slice(5, 16))}</div>
         </div>
       </div>
     </div>`;
   }
-  return `<div class="space-card">
-    <h4>📷 今日自拍签到</h4>
-    <div class="tip">每天一张照片 + 一句话，见证 90 天的坚持</div>
-    <div class="cam-wrap" id="camWrap">${space.camShot
-      ? `<img id="camShot" src="${space.camShot}" alt="预览">`
-      : `<div style="color:#888;padding:30px;text-align:center;font-size:13px;">点击"打开摄像头"自拍</div>`}</div>
-    <div class="cam-actions" id="camActions">
-      <button class="cam-start" id="camStart" ${space.camShot ? "style='display:none'" : ""}>📷 打开摄像头</button>
-      <button class="cam-start" id="camPick" style="background:#7a6ad9;${space.camShot ? "display:none" : ""}">🖼 从相册选择</button>
-      <button class="cam-snap" id="camSnap" style="display:none">📸 拍照</button>
-      <button class="cam-stop" id="camRetry" style="display:none">🔄 重拍</button>
+  return `<div class="space-card sign-card">
+    <div class="sign-row">
+      <div class="sign-cam" id="signCam" title="点击拍照">
+        ${space.camShot ? `<img src="${space.camShot}" alt="预览">` : `<span class="cam-ico">📷</span>`}
+        <div class="cam-hint">${space.camShot ? "点击重拍" : "点击自拍"}</div>
+      </div>
+      <div class="sign-main">
+        <div class="sign-title">今日自拍签到</div>
+        <div class="tip" style="margin:2px 0 8px;">每天一张照片 + 一句话，见证 90 天的坚持</div>
+        <input id="signMood" class="input" placeholder="今天的一句话…" maxlength="50">
+      </div>
+    </div>
+    <div class="cam-wrap hidden" id="camWrap"></div>
+    <div class="mood-row" id="moodRow"></div>
+    <div class="btn-row">
+      <button class="btn ghost" id="signPick">🖼 从相册选择</button>
+      <button class="btn primary" id="submitSign">✅ 完成签到</button>
     </div>
     <input type="file" id="signFile" accept="image/*" style="display:none">
-    <input id="signMood" class="input" placeholder="今天的一句话（选填）" maxlength="50">
-    <div class="mood-row" id="moodRow"></div>
-    <button class="btn primary" id="submitSign" style="margin-top:8px">✅ 完成签到</button>
   </div>`;
 }
 
 function renderNoteCard() {
-  return `<div class="space-card">
-    <h4>📝 随手记</h4>
-    <div class="tip">写点心里话，可以用"✨ AI 整理"自动分类存档</div>
+  return `<div class="space-card note-card">
+    <div class="card-head"><span class="card-ico">💬</span>随手记</div>
     <textarea id="noteText" class="input" placeholder="今天学了什么？有什么想法、心情、反思？"></textarea>
     <div class="photo-pre" id="notePics"></div>
     <div class="photo-add" id="noteAddPic">＋</div>
@@ -908,8 +911,10 @@ function renderNoteCard() {
 
 function renderWeightCard() {
   const last = space.weights[space.weights.length - 1];
-  return `<div class="space-card">
-    <h4>⚖️ 体重记录</h4>
+  return `<div class="space-card weight-card">
+    <div class="card-head"><span class="card-ico">⚖️</span>体重记录
+      ${last ? `<span class="card-sub">上次 ${last.value} kg · ${esc(last.date.slice(5))}</span>` : ""}
+    </div>
     <div class="weight-row">
       <input id="wValue" class="input" type="number" step="0.1" min="20" max="300" placeholder="${last ? last.value + " kg" : "kg"}">
       <button class="btn primary" id="wSave" style="width:auto;padding:10px 18px;">记录</button>
@@ -1003,13 +1008,15 @@ function renderPrivCard() {
 }
 
 function bindSpaceEvents() {
-  // 签到
-  const cs = $("#camStart"), sn = $("#camSnap"), rt = $("#camRetry");
-  if (cs) cs.onclick = startCam;
-  if (sn) sn.onclick = snapShot;
-  if (rt) rt.onclick = () => { stopCam(); space.camShot = null; renderSpace(); };
-  const cp = $("#camPick"), sf = $("#signFile");
-  if (cp) cp.onclick = () => sf.click();
+  // 签到（自拍 + 心情合一）
+  const sc = $("#signCam");
+  if (sc) sc.onclick = () => {
+    if (space.camShot) { space.camShot = null; renderSpace(); return; }
+    startCam();
+  };
+  const sf = $("#signFile");
+  const sp = $("#signPick");
+  if (sp) sp.onclick = () => { if (sf) sf.click(); };
   if (sf) sf.onchange = async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -1097,11 +1104,12 @@ async function startCam() {
   try {
     space.camStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
     const w = $("#camWrap");
-    w.innerHTML = `<video id="camVideo" autoplay playsinline></video>`;
+    if (!w) return;
+    w.classList.remove("hidden");
+    w.innerHTML = `<video id="camVideo" autoplay playsinline></video>
+      <button class="cam-snap" id="camSnap">📸 拍照</button>`;
     w.querySelector("video").srcObject = space.camStream;
-    $("#camStart").style.display = "none";
-    $("#camSnap").style.display = "";
-    $("#camRetry").style.display = "";
+    $("#camSnap").onclick = snapShot;
   } catch (e) {
     toast("摄像头无法打开：" + (e.name === "NotAllowedError" ? "请允许摄像头权限" : "设备不可用"));
   }
@@ -1120,8 +1128,9 @@ function stopCam() {
     space.camStream.getTracks().forEach(t => t.stop());
     space.camStream = null;
   }
+  const w = $("#camWrap");
+  if (w) w.classList.add("hidden");
 }
-
 async function submitSign() {
   if (!space.camShot) { toast("先拍一张自拍"); return; }
   try {

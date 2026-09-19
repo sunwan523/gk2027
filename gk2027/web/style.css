@@ -257,3 +257,54 @@ textarea.input { min-height:84px; resize:vertical; }
 .h-user { display:flex; align-items:center; gap:6px; background:none; border:none; cursor:pointer; padding:2px 6px 2px 0; font-size:14px; font-weight:600; color:#333; min-width:0; }
 .h-av { width:26px; height:26px; border-radius:50%; object-fit:cover; background:#4a90d9; flex:none; }
 .h-av-t { display:inline-flex; align-items:center; justify-content:center; color:#fff; font-size:13px; font-weight:700; }
+
+/* ---------- 📖 空间 · QQ 空间风 ---------- */
+.qq-cover { position:relative; overflow:hidden; border-radius:18px; padding:34px 16px 22px; text-align:center;
+  background:linear-gradient(135deg,#5b7cfa 0%,#7d5cf6 55%,#a06bf5 100%);
+  color:#fff; margin-bottom:14px; box-shadow:0 6px 18px rgba(91,124,250,.25); }
+.cover-deco { position:absolute; border-radius:50%; background:rgba(255,255,255,.12); }
+.cover-deco.d1 { width:120px; height:120px; top:-40px; left:-30px; }
+.cover-deco.d2 { width:70px; height:70px; bottom:-20px; right:28px; background:rgba(255,255,255,.08); }
+.cover-deco.d3 { width:34px; height:34px; top:18px; right:70px; background:rgba(255,255,255,.18); }
+.cover-ava { width:76px; height:76px; border-radius:50%; overflow:hidden; margin:0 auto 10px;
+  background:rgba(255,255,255,.25); border:3px solid rgba(255,255,255,.85);
+  display:flex; align-items:center; justify-content:center; font-size:30px; font-weight:700; box-shadow:0 4px 12px rgba(0,0,0,.18); }
+.cover-ava img { width:100%; height:100%; object-fit:cover; }
+.cover-name { font-size:19px; font-weight:700; text-shadow:0 1px 4px rgba(0,0,0,.2); }
+.cover-sig { font-size:12px; opacity:.92; margin-top:5px; }
+.cover-edit { position:absolute; top:12px; right:12px; background:rgba(255,255,255,.22); color:#fff;
+  border:none; border-radius:16px; padding:5px 12px; font-size:12px; cursor:pointer; }
+.cover-badge { position:absolute; top:12px; left:12px; background:rgba(0,0,0,.22); border-radius:14px;
+  padding:4px 10px; font-size:12px; }
+.priv-tip { background:#fff7e8; border:1px solid #f3dfb8; color:#a8822f; border-radius:12px;
+  padding:9px 12px; font-size:13px; margin-bottom:12px; }
+
+.space-card { border-radius:16px; box-shadow:0 2px 10px rgba(30,50,100,.05); }
+.card-head { display:flex; align-items:center; gap:7px; font-size:15px; font-weight:700; color:#333; margin-bottom:9px; }
+.card-ico { width:28px; height:28px; border-radius:9px; background:linear-gradient(135deg,#5b7cfa,#7d5cf6);
+  color:#fff; display:inline-flex; align-items:center; justify-content:center; font-size:14px; }
+.card-sub { margin-left:auto; font-size:11px; font-weight:400; color:#999; }
+
+.sign-card { }
+.sign-row { display:flex; gap:14px; align-items:center; }
+.sign-cam { position:relative; width:86px; height:86px; border-radius:50%; overflow:hidden; flex:none;
+  background:linear-gradient(135deg,#5b7cfa,#a06bf5); display:flex; align-items:center; justify-content:center;
+  cursor:pointer; box-shadow:0 4px 12px rgba(91,124,250,.3); }
+.sign-cam .cam-ico { font-size:34px; }
+.sign-cam img { width:100%; height:100%; object-fit:cover; }
+.sign-cam .cam-hint { position:absolute; bottom:0; left:0; right:0; background:rgba(0,0,0,.45);
+  color:#fff; font-size:10px; text-align:center; padding:2px 0; }
+.sign-cam.done { cursor:default; box-shadow:none; }
+.sign-main { flex:1; min-width:0; }
+.sign-title { font-size:15px; font-weight:700; color:#333; }
+.sign-mood-txt { font-size:14px; color:#333; margin-top:5px; line-height:1.5; }
+.sd-badge { display:inline-block; background:#e8f7ef; color:#1fd16f; font-size:11px; border-radius:8px;
+  padding:2px 8px; font-weight:600; vertical-align:2px; margin-left:4px; }
+.cam-wrap { position:relative; border-radius:14px; overflow:hidden; background:#111; margin:10px 0 6px; }
+.cam-wrap video { width:100%; display:block; max-height:240px; object-fit:cover; }
+.cam-wrap .cam-snap { position:absolute; bottom:12px; left:50%; transform:translateX(-50%);
+  background:#1fd16f; color:#fff; border:none; border-radius:22px; padding:9px 22px; font-size:14px; cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.3); }
+.mood-row { margin:8px 0 0; }
+
+.weight-card { background:linear-gradient(180deg,#fdfeff,#fff); }
+.note-card { }

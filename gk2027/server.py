@@ -71,7 +71,15 @@ def index():
     return FileResponse(os.path.join(WEB_DIR, "index.html"))
 
 
-app.mount("/web", StaticFiles(directory=WEB_DIR), name="web")
+@app.get("/web/app.js")
+def web_appjs():
+    return FileResponse(os.path.join(WEB_DIR, "app.js"),
+                        headers={"Cache-Control": "no-cache"})
+
+@app.get("/web/style.css")
+def web_css():
+    return FileResponse(os.path.join(WEB_DIR, "style.css"),
+                        headers={"Cache-Control": "no-cache"})
 
 
 # ----------------------------------------------------------------------
