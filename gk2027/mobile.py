@@ -203,25 +203,161 @@ def render_lesson():
         st.markdown("掌握度 **%d%%**（%s）" % (round(row["mastery"] * 100), row["status"]))
         if r["newly_unlocked"]:
             st.info("🔓 解锁了 %d 节新课" % r["newly_unlocked"])
+        # AI出题测试
+        if st.button("🤖 AI出题测试（再练5题）", use_container_width=True):
+            L["phase"] = "ai_loading"
+            st.rerun()
         if st.button("返回课程列表", type="primary"):
             st.session_state.lesson = None
             st.rerun()
         return
 
+    # AI出题加载
+    if L["phase"] == "ai_loading":
+        from core import ai_quiz
+        st.subheader("🤖 AI出题中…")
+        st.caption("正在根据「%s」的知识点内容生成测试题" % L["name"])
+        with st.spinner("DeepSeek 正在出题，请稍候…"):
+            try:
+                # 获取科目
+                kp_row = c.execute("SELECT subject FROM knowledge_points WHERE id=?",
+                                  (L["kp_id"],)).fetchone()
+                subject = kp_row["subject"] if kp_row else "数学"
+                ai_qs = ai_quiz.generate_quiz(
+                    subject, L["name"], L.get("points", []), count=5)
+                L["ai_qs"] = ai_qs
+                L["ai_idx"] = 0
+                L["ai_results"] = []
+                L["phase"] = "ai_q"
+                st.rerun()
+            except Exception as e:
+                st.error("AI出题失败：%s" % str(e)[:200])
+                if st.button("返回"):
+                    L["phase"] = "done"
+                    st.rerun()
+                return
+
+    # AI出题答题
+    if L["phase"] in ("ai_q", "ai_fb"):
+        ai_qs = L.get("ai_qs", [])
+        ai_idx = L.get("ai_idx", 0)
+        if ai_idx >= len(ai_qs):
+            # AI测试完成
+            st.balloons()
+            st.subheader("🤖 AI测试完成")
+            correct = sum(L.get("ai_results", []))
+            total = len(ai_qs)
+            st.markdown("答对 **%d / %d** 题" % (correct, total))
+            if correct == total:
+                st.success("全对！掌握得很扎实 🔥")
+            elif correct >= total * 0.6:
+                st.info("不错，再复习一下错题就更好了")
+            else:
+                st.warning("建议回到知识点卡片再复习一遍")
+            if st.button("返回课程列表", type="primary"):
+                st.session_state.lesson = None
+                st.rerun()
+            return
+
+        q = ai_qs[ai_idx]
+        st.progress(ai_idx / max(1, len(ai_qs)))
+        st.caption("🤖 AI出题 · 第 %d/%d 题 · %s" % (ai_idx + 1, len(ai_qs), q["qtype"]))
+        st.markdown("##### %s" % q["stem"])
+
+        key = "ai_ans_%d" % ai_idx
+        if L["phase"] == "ai_q":
+            if q["qtype"] == "选择题":
+                labels = q["options"] or ["（无选项）"]
+                st.radio("选择答案", labels, key=key, label_visibility="collapsed")
+                if st.button("提交答案", type="primary", use_container_width=True):
+                    pick = st.session_state.get(key, "")
+                    letter = ""
+                    for o in q["options"]:
+                        if o == pick:
+                            letter = queue._letter_of(o)
+                    ok = queue.grade_choice(letter, q["answer"]) if q["options"] else False
+                    L["ai_results"].append(ok)
+                    L["phase"] = "ai_fb"
+                    L["ai_last"] = ok
+                    st.rerun()
+            else:
+                st.text_input("你的答案", key=key, placeholder="输入答案")
+                if st.button("提交答案", type="primary", use_container_width=True):
+                    ok = queue.grade_fill(st.session_state.get(key, ""), q["answer"])
+                    L["ai_results"].append(ok)
+                    L["phase"] = "ai_fb"
+                    L["ai_last"] = ok
+                    st.rerun()
+
+        if L["phase"] == "ai_fb":
+            if L.get("ai_last"):
+                st.success("✅ 答对了")
+            else:
+                st.error("❌ 答错了")
+            st.markdown("**答案：** %s" % q["answer"])
+            if q["analysis"]:
+                st.markdown("解析：%s" % q["analysis"])
+            if st.button("下一题 →", type="primary", use_container_width=True):
+                L["ai_idx"] = ai_idx + 1
+                L["phase"] = "ai_q"
+                st.rerun()
+        return
+
     if L["phase"] == "learn":
-        st.subheader("📖 先学：%s" % L["name"])
+        st.subheader("📖 %s" % L["name"])
         pts = L.get("points") or []
-        if pts:
-            # 朗读控制条：上一条 / 播放暂停 / 下一条 / 停止 / 语速
-            _render_tts_controls(pts)
-            for i, p in enumerate(pts):
-                st.markdown("- %s" % p)
+        if not pts:
+            st.info("该知识点暂无详细讲解，可直接进入练习。")
         else:
-            st.info("该知识点暂无详细讲解（内容生成中）。可直接进入练习，"
-                    "或对照纸质《总复习文档》学习后再来。")
-        st.caption("读完要点后进入练习，共 %d 题" % len(qs))
+            # 卡片式翻页学习
+            card_idx = L.get("card_idx", 0)
+            total = len(pts)
+
+            # 朗读控制条
+            _render_tts_controls(pts)
+
+            # 卡片进度
+            st.progress(card_idx / max(1, total - 1))
+            st.caption("卡片 %d / %d" % (card_idx + 1, total))
+
+            # 当前卡片
+            with st.container(border=True):
+                st.markdown(
+                    """
+                    <div style="padding:20px 16px;min-height:180px;
+                                display:flex;align-items:center;justify-content:center;
+                                background:linear-gradient(135deg,#f8f9ff,#eef2ff);
+                                border-radius:12px;margin:8px 0;">
+                      <div style="font-size:15px;line-height:1.8;color:#1a1b1c;text-align:left;width:100%;">
+                        %s
+                      </div>
+                    </div>
+                    """.replace("                    ", "") % pts[card_idx],
+                    unsafe_allow_html=True)
+
+            # 翻页按钮
+            col_p, col_n = st.columns(2)
+            if col_p.button("⬅️ 上一张", disabled=(card_idx == 0),
+                           use_container_width=True):
+                L["card_idx"] = card_idx - 1
+                st.rerun()
+            if col_n.button("下一张 ➡️", disabled=(card_idx >= total - 1),
+                           use_container_width=True):
+                L["card_idx"] = card_idx + 1
+                st.rerun()
+
+            # 快速跳选
+            with st.expander("跳转到指定卡片"):
+                jump = st.slider("卡片", 1, total, card_idx + 1,
+                                 key="card_jump")
+                if st.button("跳转", use_container_width=True):
+                    L["card_idx"] = jump - 1
+                    st.rerun()
+
+        st.divider()
         b1, b2 = st.columns([3, 1])
-        if b1.button("我学完了，开始练习 ✏️", type="primary", use_container_width=True):
+        if b1.button("我学完了，开始练习 ✏️", type="primary",
+                     use_container_width=True):
             L["phase"] = "q"
             st.rerun()
         if b2.button("跳过", use_container_width=True):
@@ -313,7 +449,8 @@ def open_lesson(kp_id: str, name: str):
     pts = content.get_content(kp_id)
     st.session_state.lesson = {"kp_id": kp_id, "name": name, "qs": qs,
                                "idx": 0, "phase": "learn", "results": [],
-                               "last_correct": False, "points": pts}
+                               "last_correct": False, "points": pts,
+                               "card_idx": 0}
 
 
 ICON = {"可学": "▶️", "学习中": "🔶", "需复习": "🔁", "已掌握": "✅", "未解锁": "🔒"}
