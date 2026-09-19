@@ -78,7 +78,7 @@ function ttsToggle() {
 function ttsStop() { window.speechSynthesis.cancel(); tts.playing = false; syncPlayBtn(); }
 function syncPlayBtn() {
   const b = $("#ttsPlay");
-  if (b) b.textContent = tts.playing ? "⏸ 暂停" : (window.speechSynthesis.paused ? "▶️ 继续" : "▶️ 朗读");
+  if (b) b.textContent = tts.playing ? "⏸" : "▶️";
 }
 
 // ---------- 埋点：切页/离开时上报停留时长（上限5分钟） ----------
@@ -444,7 +444,7 @@ function renderDeck(points) {
     <div class="tts-bar">
       <div class="tts-row">
         <button class="tts-mini" id="deckPrev" title="上一条">⏮</button>
-        <button class="tts-play" id="ttsPlay">▶️ 朗读</button>
+        <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
         <button class="tts-mini" id="deckNext" title="下一条">⏭</button>
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
         <span class="tts-spd" title="语速">语速</span>
