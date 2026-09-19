@@ -119,6 +119,7 @@ button { font-family:inherit; }
 .tts-pop[hidden] { display:none; }
 .tts-pop button { border:none; background:#f0f4ff; border-radius:9px; padding:8px 16px; font-size:14px; font-weight:600; color:#333; cursor:pointer; }
 .tts-pop button:active { background:#dce8ff; }
+.tts-pop button.on { background:#5b7cfa; color:#fff; }
 .tts-btn { border:1px solid #cfe2ff; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
 .tts-play { border:none; background:transparent; color:#5b7cfa; width:42px; height:42px; cursor:pointer; font-size:22px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .tts-play:active { background:#eef1f8; }

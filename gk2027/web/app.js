@@ -27,7 +27,7 @@ async function api(path, opts) {
 const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
 
 // ---------- 朗读（在线 Edge TTS 优先，系统语音后备） ----------
-let tts = { voices: [], voice: null, multi: [], rate: 1, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
+let tts = { voices: [], voice: null, multi: [], rate: 1, font: 18, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
 function saveMulti() {
   try { localStorage.setItem("tts_voices_multi", JSON.stringify(tts.multi.map(v => v.name))); } catch (e) {}
 }
@@ -56,6 +56,8 @@ function fillVoiceSel() {
 }
 function ttsLoadVoices() {
   const _rateOpts = [1, 1.5, 2];
+  tts.font = parseInt(localStorage.getItem("tts_font") || "18") || 18;
+  if (![16, 18, 20, 22].includes(tts.font)) tts.font = 18;
   tts.rate = parseFloat(localStorage.getItem("tts_rate") || "1");
   tts.rate = _rateOpts.reduce((a, b) => Math.abs(b - tts.rate) < Math.abs(a - tts.rate) ? b : a, _rateOpts[0]);
   localStorage.setItem("tts_rate", String(tts.rate));
@@ -577,6 +579,7 @@ function renderDeck(points) {
         <span class="tts-side">
           <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
           <button class="tts-spd" id="ttsRateBtn" title="语速">语速▾</button>
+          <button class="tts-spd" id="ttsFontBtn" title="字号">字号▾</button>
         </span>
         <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶</button>
         <span class="tts-side tts-right">
@@ -589,8 +592,16 @@ function renderDeck(points) {
         <button data-r="1.5">1.5x</button>
         <button data-r="2">2x</button>
       </div>
+      <div class="tts-pop" id="ttsFontPop" hidden>
+        <button data-f="16">小</button>
+        <button data-f="18">中</button>
+        <button data-f="20">大</button>
+        <button data-f="22">特大</button>
+      </div>
     </div>`;
   ttsLoadVoices();
+  const fbody = $("#deckBody");
+  if (fbody) fbody.style.fontSize = (tts.font || 18) + "px";
   bindDeck(points);
   saveProgress();
 }
@@ -612,13 +623,32 @@ function bindDeck(points) {
   $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
   const rbtn = $("#ttsRateBtn"), rpop = $("#ttsRatePop");
   if (rbtn && rpop) {
-    rbtn.onclick = (e) => { e.stopPropagation(); rpop.hidden = !rpop.hidden; };
+    rbtn.onclick = (e) => { e.stopPropagation(); const fp = $("#ttsFontPop"); if (fp) fp.hidden = true; rpop.hidden = !rpop.hidden; };
     rpop.querySelectorAll("button").forEach(b => {
       b.onclick = () => {
         tts.rate = parseFloat(b.dataset.r);
         localStorage.setItem("tts_rate", String(tts.rate));
         rpop.hidden = true;
         ttsApplyRateNow();
+      };
+    });
+  }
+  const fbtn = $("#ttsFontBtn"), fpop = $("#ttsFontPop");
+  if (fbtn && fpop) {
+    fbtn.onclick = (e) => {
+      e.stopPropagation();
+      const rp = $("#ttsRatePop"); if (rp) rp.hidden = true;
+      fpop.hidden = !fpop.hidden;
+      fpop.querySelectorAll("button").forEach(b => b.classList.toggle("on", parseInt(b.dataset.f) === (tts.font || 18)));
+    };
+    fpop.querySelectorAll("button").forEach(b => {
+      b.onclick = () => {
+        const n = parseInt(b.dataset.f);
+        tts.font = n;
+        localStorage.setItem("tts_font", String(n));
+        const db = $("#deckBody");
+        if (db) db.style.fontSize = n + "px";
+        fpop.hidden = true;
       };
     });
   }
