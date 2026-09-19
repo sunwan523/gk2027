@@ -219,13 +219,20 @@ async function startLesson(kpId) {
   } catch (e) { toast(e.message); }
 }
 
+function exitToLearn() {
+  lesson = null; aiQuiz = null; deck.idx = 0;
+  ttsStop();
+  renderLearn();
+}
+
 function renderLesson() {
   const L = lesson;
   const el = $("#tabLearn");
   if (L.phase === "done") { renderLessonDone(L); return; }
   if (L.phase === "learn") {
     reportAct("学习", L.subject, L.kp_id);
-    el.innerHTML = `<h3>📖 ${esc(L.name)}</h3>
+    el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitLearn">← 返回</button></div>
+      <h3>📖 ${esc(L.name)}</h3>
       <div class="cap">${L.points.length} 张知识点卡片 · 朗读可自动翻页</div>
       <div id="deckWrap"></div>
       <div class="btn-row">
@@ -233,6 +240,7 @@ function renderLesson() {
         <button class="btn ghost" id="skipQuiz">跳过</button>
       </div>`;
     renderDeck(L.points);
+    $("#exitLearn").onclick = exitToLearn;
     $("#toQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
     $("#skipQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
     return;
@@ -244,13 +252,15 @@ function renderLesson() {
     return;
   }
   const q = L.questions[L.idx];
-  el.innerHTML = `<div class="q-progress">
+  el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitQuiz">← 返回列表</button></div>
+    <div class="q-progress">
       <div class="bar"><div style="width:${Math.round(L.idx / L.questions.length * 100)}%"></div></div>
       <span>${esc(L.name)} · 第 ${L.idx + 1}/${L.questions.length} 题 · ${q.qtype}</span>
     </div>
     <div class="q-stem">${esc(q.stem)}</div>
     <div id="qBody"></div>`;
   const qb = $("#qBody");
+  const eb = $("#exitQuiz"); if (eb) eb.onclick = exitToLearn;
   if (L.phase === "q") {
     if (q.qtype === "选择题") {
       qb.innerHTML = q.options.map((o, i) =>
@@ -403,9 +413,11 @@ async function renderAiQuiz() {
   const A = aiQuiz;
   reportAct("练习", lesson ? lesson.subject : "", lesson ? lesson.kp_id : "");
   if (A.phase === "loading") {
-    el.innerHTML = `<div class="spinner">🤖 DeepSeek 出题中…<br><span style="font-size:12px;">根据「${esc(A.name)}」生成基础测试题</span></div>`;
+    el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitAi">← 返回列表</button></div>
+    <div class="spinner">🤖 DeepSeek 出题中…<br><span style="font-size:12px;">根据「${esc(A.name)}」生成基础测试题</span></div>`;
     try {
       const d = await post("/api/ai_quiz", { kp_id: A.kp_id });
+      if (A.cancelled) return;
       A.questions = d.questions || [];
       A.phase = "q";
       renderAiQuiz();
@@ -426,12 +438,14 @@ async function renderAiQuiz() {
     return;
   }
   const q = A.questions[A.idx];
-  el.innerHTML = `<div class="q-progress">
+  el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitAi">← 返回列表</button></div>
+    <div class="q-progress">
       <div class="bar"><div style="width:${Math.round(A.idx / A.questions.length * 100)}%"></div></div>
       <span>🤖 AI出题 · 第 ${A.idx + 1}/${A.questions.length} 题 · ${q.qtype}</span>
     </div>
     <div class="q-stem">${esc(q.stem)}</div><div id="qBody"></div>`;
   const qb = $("#qBody");
+  const ae = $("#exitAi"); if (ae) ae.onclick = () => { A.cancelled = true; exitToLearn(); };
   if (A.phase === "q") {
     if (q.qtype === "选择题") {
       qb.innerHTML = q.options.map((o, i) => `<button class="q-opt" data-i="${i}">${esc(o)}</button>`).join("") +
