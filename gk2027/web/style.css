@@ -107,6 +107,7 @@ button { font-family:inherit; }
 .tts-mini { border:none; background:#eef1f8; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .tts-spd { font-size:11px; color:#666; flex-shrink:0; white-space:nowrap; }
 .tts-row input[type=range] { width:60px; flex-shrink:1; min-width:36px; }
+.tts-rate { font-size:13px; padding:4px 8px; border:1px solid #cfe2ff; border-radius:8px; background:#fff; color:#333; flex-shrink:0; cursor:pointer; }
 .tts-row select { font-size:10px; padding:1px; border:1px solid #cfe2ff; border-radius:4px; flex:1; min-width:56px; max-width:110px; }
 .tts-auto { font-size:10px; color:#666; display:flex; align-items:center; gap:2px; white-space:nowrap; }
 

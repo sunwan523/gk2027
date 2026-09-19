@@ -41,7 +41,10 @@ function fillVoiceSel() {
   });
 }
 function ttsLoadVoices() {
+  const _rateOpts = [1, 1.5, 2];
   tts.rate = parseFloat(localStorage.getItem("tts_rate") || "1");
+  tts.rate = _rateOpts.reduce((a, b) => Math.abs(b - tts.rate) < Math.abs(a - tts.rate) ? b : a, _rateOpts[0]);
+  localStorage.setItem("tts_rate", String(tts.rate));
   tts.pitch = parseFloat(localStorage.getItem("tts_pitch") || "1");
   const saved = localStorage.getItem("tts_voice") || "";
   const sysVoices = (window.speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().indexOf("zh") >= 0);
@@ -333,7 +336,7 @@ function clearProgress() { try { localStorage.removeItem(progKey()); } catch (e)
 
 function exitToLearn() {
   saveProgress();
-  lesson = null; aiQuiz = null; deck.idx = 0;
+  lesson = null; aiQuiz = null; deck.idx = 0; deck.speak = false;
   ttsStop();
   const hb = $("#headerBar"); if (hb) hb.style.display = "";
   renderLearn();
@@ -504,7 +507,7 @@ function renderLessonDone(L) {
 }
 
 // ---------- 知识点卡片（朗读 + 自动翻页） ----------
-let deck = { idx: 0, auto: true };
+let deck = { idx: 0, auto: true, speak: false };
 function renderDeck(points) {
   if (!points || !points.length) return;
   deck.idx = Math.min(deck.idx, points.length - 1);
@@ -526,18 +529,32 @@ function renderDeck(points) {
         <button class="tts-mini" id="deckNext" title="下一条">⏭</button>
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
         <span class="tts-spd" title="语速">语速</span>
-        <input type="range" id="ttsRate" min="0.6" max="1.6" step="0.1" value="${tts.rate}">
+        <select id="ttsRate" class="tts-rate" title="语速">
+          ${[1, 1.5, 2].map(r => `<option value="${r}" ${Math.abs(tts.rate - r) < 0.01 ? "selected" : ""}>${r}x</option>`).join("")}
+        </select>
       </div>
     </div>`;
   ttsLoadVoices();
   bindDeck(points);
   saveProgress();
 }
+function deckTurnTo(i, points) {
+  ttsStop();
+  deck.idx = Math.max(0, Math.min(points.length - 1, i));
+  renderDeck(points);
+  if (deck.speak && !tts.playing) deckReadFrom(deck.idx, points);
+}
+function deckReadFrom(i, points) {
+  if (i < 0 || i >= points.length) return;
+  ttsSpeak([points[i]], () => {
+    if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); deckReadFrom(deck.idx, points); }
+  });
+}
 function bindDeck(points) {
-  $("#deckPrev").onclick = () => { ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); };
-  $("#deckNext").onclick = () => { ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); };
+  $("#deckPrev").onclick = () => deckTurnTo(deck.idx - 1, points);
+  $("#deckNext").onclick = () => deckTurnTo(deck.idx + 1, points);
   $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
-  $("#ttsRate").oninput = (e) => { tts.rate = parseFloat(e.target.value); localStorage.setItem("tts_rate", String(tts.rate)); };
+  $("#ttsRate").onchange = (e) => { tts.rate = parseFloat(e.target.value); localStorage.setItem("tts_rate", String(tts.rate)); };
   const tv = $("#ttsVoice");
   if (tv) tv.onchange = (e) => {
     const v = tts.voices[parseInt(e.target.value)];
@@ -545,18 +562,13 @@ function bindDeck(points) {
   };
   $("#ttsPlay").onclick = () => {
     if (tts.playing || window.speechSynthesis.paused) { ttsToggle(); return; }
-    const readFrom = (i) => {
-      if (i < 0 || i >= points.length) return;
-      ttsSpeak([points[i]], () => {
-        if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); readFrom(deck.idx); }
-      });
-    };
-    readFrom(deck.idx);
+    deck.speak = true;
+    deckReadFrom(deck.idx, points);
   };
   // 左右边缘点击翻页
   const tl = $("#deckTapL"), tr = $("#deckTapR");
-  if (tl) tl.onclick = (e) => { e.stopPropagation(); ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); };
-  if (tr) tr.onclick = (e) => { e.stopPropagation(); ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); };
+  if (tl) tl.onclick = (e) => { e.stopPropagation(); deckTurnTo(deck.idx - 1, points); };
+  if (tr) tr.onclick = (e) => { e.stopPropagation(); deckTurnTo(deck.idx + 1, points); };
 
   // 左右滑动切换卡片
   const body = $("#deckBody");
@@ -568,8 +580,7 @@ function bindDeck(points) {
       tracking = false;
       const dx = e.clientX - sx, dy = e.clientY - sy;
       if (Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-        if (dx < 0) { ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); }
-        else { ttsStop(); deck.idx = Math.max(0, deck.idx - 1); renderDeck(points); }
+        deckTurnTo(deck.idx + (dx < 0 ? 1 : -1), points);
       }
     }, { passive: true });
     body.addEventListener("pointercancel", () => { tracking = false; });
