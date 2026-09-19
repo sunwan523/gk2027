@@ -254,11 +254,12 @@ async function startLesson(kpId) {
   } catch (e) { toast(e.message); }
 }
 
-const PROG_KEY = "lesson_progress";
+function progKey() { return "lesson_progress_" + (me ? me.id : "anon"); }
 function saveProgress() {
-  if (!lesson || lesson.phase === "done") { clearProgress(); return; }
+  // 学习中才保存；无课程/已完成/未登录一律不动已有快照（防止列表页关页面误清）
+  if (!lesson || lesson.phase === "done" || !me) return;
   try {
-    localStorage.setItem(PROG_KEY, JSON.stringify({
+    localStorage.setItem(progKey(), JSON.stringify({
       kp_id: lesson.kp_id, phase: lesson.phase,
       card_idx: deck.idx, q_idx: lesson.idx,
       results: lesson.results || [], ts: Date.now(),
@@ -266,9 +267,9 @@ function saveProgress() {
   } catch (e) {}
 }
 function loadProgress() {
-  try { return JSON.parse(localStorage.getItem(PROG_KEY) || "null"); } catch (e) { return null; }
+  try { return JSON.parse(localStorage.getItem(progKey()) || "null"); } catch (e) { return null; }
 }
-function clearProgress() { try { localStorage.removeItem(PROG_KEY); } catch (e) {} }
+function clearProgress() { try { localStorage.removeItem(progKey()); } catch (e) {} }
 
 function exitToLearn() {
   saveProgress();
