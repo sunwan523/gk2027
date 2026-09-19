@@ -90,6 +90,7 @@ function ttsSay(i) {
 }
 async function ttsSayOnline(i) {
   if (i < 0 || i >= tts.queue.length) return;
+  ttsStopAudio();
   tts.idx = i; tts.playing = true; syncPlayBtn();
   const text = tts.queue[i];
   if (!tts.voice || !tts.voice.short) { fallbackToSys(i); return; }
@@ -120,6 +121,11 @@ function fallbackToSys(i) {
   tts.playing = false;
   window.speechSynthesis.cancel();
   ttsSay(i);
+}
+function ttsApplyRateNow() {
+  if (!tts.playing) return;
+  if (tts.voice && tts.voice.online) { ttsSayOnline(tts.idx); }
+  else { window.speechSynthesis.cancel(); ttsSay(tts.idx); }
 }
 function ttsStopAudio() {
   if (tts.audio) { tts.audio.pause(); tts.audio = null; }
@@ -524,19 +530,19 @@ function renderDeck(points) {
     </div>
     <div class="tts-bar">
       <div class="tts-row">
-        <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
+        <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
         <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
-        <span class="tts-right">
-          <button class="tts-turn" id="deckPrev" title="上一张">上一页</button>
-          <button class="tts-turn" id="deckNext" title="下一张">下一页</button>
-        </span>
       </div>
       <div class="tts-pop" id="ttsRatePop" hidden>
         <button data-r="1">1x</button>
         <button data-r="1.5">1.5x</button>
         <button data-r="2">2x</button>
       </div>
+    </div>
+    <div class="deck-nav" id="deckNav">
+      <button class="tts-turn" id="deckPrev" title="上一张">← 上一页</button>
+      <button class="tts-turn" id="deckNext" title="下一张">下一页 →</button>
     </div>`;
   ttsLoadVoices();
   bindDeck(points);
@@ -566,6 +572,7 @@ function bindDeck(points) {
         tts.rate = parseFloat(b.dataset.r);
         localStorage.setItem("tts_rate", String(tts.rate));
         rpop.hidden = true;
+        ttsApplyRateNow();
       };
     });
   }
