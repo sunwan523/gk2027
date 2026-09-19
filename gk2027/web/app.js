@@ -27,17 +27,31 @@ async function api(path, opts) {
 const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
 
 // ---------- 朗读（在线 Edge TTS 优先，系统语音后备） ----------
-let tts = { voices: [], voice: null, rate: 1, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
+let tts = { voices: [], voice: null, multi: [], rate: 1, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
+function saveMulti() {
+  try { localStorage.setItem("tts_voices_multi", JSON.stringify(tts.multi.map(v => v.name))); } catch (e) {}
+}
 function fillVoiceSel() {
-  const sel = $("#setVoice") || $("#ttsVoice");
-  if (!sel) return;
-  sel.innerHTML = "";
-  if (!tts.voices.length) { sel.innerHTML = '<option value="">无可用语音</option>'; return; }
-  tts.voices.forEach((v, i) => {
-    const o = document.createElement("option");
-    o.value = i; o.text = v.name;
-    sel.appendChild(o);
-    if (tts.voice && v.name === tts.voice.name) sel.value = i;
+  const box = $("#setVoice") || $("#ttsVoice");
+  if (!box) return;
+  box.innerHTML = "";
+  if (!tts.voices.length) { box.innerHTML = '<span style="color:#999;font-size:12px;">无可用语音</span>'; return; }
+  tts.voices.forEach((v) => {
+    const lab = document.createElement("label");
+    lab.className = "voice-item";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.value = v.name;
+    cb.checked = !!tts.multi.find(x => x.name === v.name);
+    cb.onchange = () => {
+      if (cb.checked) { if (!tts.multi.find(x => x.name === v.name)) tts.multi.push(v); }
+      else { tts.multi = tts.multi.filter(x => x.name !== v.name); }
+      if (!tts.multi.length) tts.multi = [v];
+      tts.voice = tts.multi[0] || null;
+      saveMulti();
+    };
+    lab.appendChild(cb);
+    lab.appendChild(document.createTextNode(" " + v.name));
+    box.appendChild(lab);
   });
 }
 function ttsLoadVoices() {
@@ -46,9 +60,17 @@ function ttsLoadVoices() {
   tts.rate = _rateOpts.reduce((a, b) => Math.abs(b - tts.rate) < Math.abs(a - tts.rate) ? b : a, _rateOpts[0]);
   localStorage.setItem("tts_rate", String(tts.rate));
   tts.pitch = parseFloat(localStorage.getItem("tts_pitch") || "1");
+  let multiNames = [];
+  try { multiNames = JSON.parse(localStorage.getItem("tts_voices_multi") || "null") || []; } catch (e) { multiNames = []; }
   const saved = localStorage.getItem("tts_voice") || "";
+  if (!multiNames.length && saved) multiNames = [saved];   // 旧单选迁移
   const sysVoices = (window.speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().indexOf("zh") >= 0);
-  const pick = () => { tts.voice = tts.voices.find(v => v.name === saved) || tts.voices[0] || null; fillVoiceSel(); };
+  const pick = () => {
+    if (multiNames.length) tts.multi = tts.voices.filter(v => multiNames.includes(v.name));
+    if (!tts.multi.length) tts.multi = tts.voices.slice(0, 1);
+    tts.voice = tts.multi[0] || null;
+    fillVoiceSel();
+  };
   // 系统语音先占位
   tts.voices = sysVoices.map(v => ({ name: "系统·" + v.name, obj: v, online: false }));
   pick();
@@ -64,6 +86,14 @@ function ttsLoadVoices() {
     }).catch(() => {});
   } catch (e) {}
 }
+function ttsUseOnline() { return (tts.multi || []).some(v => v.online && v.short); }
+function pickVoice(i) {
+  const on = (tts.multi || []).filter(v => v.online && v.short);
+  if (on.length) { const m = on.length; return on[((i % m) + m) % m]; }
+  const sys = (tts.multi || []).filter(v => !v.online && v.obj);
+  if (sys.length) { const m = sys.length; return sys[((i % m) + m) % m]; }
+  return null;
+}
 if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
   speechSynthesis.onvoiceschanged = ttsLoadVoices;
 }
@@ -71,7 +101,7 @@ if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
 function ttsSpeak(texts, onDone) {
   tts.queue = texts; tts.idx = 0; tts.onDone = onDone || null;
   if (!texts.length) return;
-  if (tts.voice && tts.voice.online) { ttsStopAudio(); ttsSayOnline(0); }
+  if (ttsUseOnline()) { ttsStopAudio(); ttsSayOnline(0); }
   else { window.speechSynthesis.cancel(); ttsSay(0); }
 }
 function ttsSay(i) {
@@ -80,7 +110,8 @@ function ttsSay(i) {
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(tts.queue[i]);
   u.lang = "zh-CN"; u.rate = tts.rate; u.pitch = tts.pitch;
-  if (tts.voice && tts.voice.obj) u.voice = tts.voice.obj;
+  const pv = pickVoice(i);
+  if (pv && pv.obj) u.voice = pv.obj;
   u.onend = () => {
     if (tts.idx < tts.queue.length - 1) { ttsSay(tts.idx + 1); }
     else { tts.playing = false; syncPlayBtn(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
@@ -93,12 +124,13 @@ async function ttsSayOnline(i) {
   ttsStopAudio();
   tts.idx = i; tts.playing = true; syncPlayBtn();
   const text = tts.queue[i];
-  if (!tts.voice || !tts.voice.short) { fallbackToSys(i); return; }
+  const pv = pickVoice(i);
+  if (!pv || !pv.short) { fallbackToSys(i); return; }
   try {
     const rateStr = (tts.rate >= 1 ? "+" : "") + Math.round((tts.rate - 1) * 100) + "%";
     const r = await fetch("/api/tts", {
       method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: text.slice(0, 1500), voice: tts.voice.short, rate: rateStr }),
+      body: JSON.stringify({ text: text.slice(0, 1500), voice: pv.short, rate: rateStr }),
     });
     if (!r.ok) throw new Error();
     const blob = await r.blob();
@@ -116,15 +148,15 @@ async function ttsSayOnline(i) {
   }
 }
 function fallbackToSys(i) {
-  const sys = tts.voices.find(v => !v.online) || null;
-  if (sys) { tts.voice = sys; localStorage.setItem("tts_voice", sys.name); try { toast("在线语音暂不可用，已切换系统语音"); } catch (e) {} }
+  const sys = (tts.voices || []).filter(v => !v.online && v.obj);
+  if (sys.length) { tts.multi = sys.slice(0, 1); tts.voice = sys[0]; saveMulti(); try { toast("在线语音暂不可用，已切换系统语音"); } catch (e) {} }
   tts.playing = false;
   window.speechSynthesis.cancel();
   ttsSay(i);
 }
 function ttsApplyRateNow() {
   if (!tts.playing) return;
-  if (tts.voice && tts.voice.online) { ttsSayOnline(tts.idx); }
+  if (ttsUseOnline()) { ttsSayOnline(tts.idx); }
   else { window.speechSynthesis.cancel(); ttsSay(tts.idx); }
 }
 function ttsStopAudio() {
@@ -132,10 +164,11 @@ function ttsStopAudio() {
 }
 function ttsToggle() {
   if (tts.playing) {
-    if (tts.voice && tts.voice.online) { if (tts.audio) tts.audio.pause(); tts.playing = false; syncPlayBtn(); }
+    if (ttsUseOnline()) { if (tts.audio) tts.audio.pause(); tts.playing = false; syncPlayBtn(); }
     else { window.speechSynthesis.pause(); tts.playing = false; syncPlayBtn(); }
-  } else if (tts.voice && tts.voice.online) {
-    if (tts.audio) { tts.audio.play().catch(() => {}); tts.playing = true; syncPlayBtn(); }
+  } else if (ttsUseOnline()) {
+    if (tts.audio && !tts.audio.ended) { tts.audio.play().catch(() => {}); tts.playing = true; syncPlayBtn(); }
+    else ttsSayOnline(tts.idx);
   } else if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); tts.playing = true; syncPlayBtn(); }
   else ttsSay(tts.idx);
 }
@@ -365,7 +398,7 @@ function renderLesson() {
       </div>
       <div id="deckWrap"></div>
       <div id="aiExplainBox"></div>
-      <div class="btn-row">
+      <div class="btn-row deck-cta">
         <button class="btn primary" id="toQuiz">开始练习 ✏️</button>
         <button class="btn ghost" id="skipQuiz">跳过</button>
       </div>`;
@@ -533,16 +566,16 @@ function renderDeck(points) {
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
         <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
         <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
+        <span class="tts-right">
+          <button class="tts-turn" id="deckPrev" title="上一张">上一页</button>
+          <button class="tts-turn" id="deckNext" title="下一张">下一页</button>
+        </span>
       </div>
       <div class="tts-pop" id="ttsRatePop" hidden>
         <button data-r="1">1x</button>
         <button data-r="1.5">1.5x</button>
         <button data-r="2">2x</button>
       </div>
-    </div>
-    <div class="deck-nav" id="deckNav">
-      <button class="tts-turn" id="deckPrev" title="上一张">← 上一页</button>
-      <button class="tts-turn" id="deckNext" title="下一张">下一页 →</button>
     </div>`;
   ttsLoadVoices();
   bindDeck(points);
@@ -1406,7 +1439,7 @@ function openSettings() {
     </div>
     <div class="row"><label>昵称</label><input id="setName" class="input" maxlength="12" value="${esc(p.nickname || (me && me.name) || "")}"></div>
     <div class="row"><label>生日</label><input id="setBirth" class="input" type="date" value="${esc(p.birthday || "")}"></div>
-    <div class="row"><label>朗读声音</label><select id="setVoice" class="input"></select></div>
+    <div class="row"><label>朗读声音（可多选，朗读时按条轮换）</label><div class="voice-list" id="setVoice"></div></div>
     <div class="btn-row">
       <button class="btn ghost" id="setCancel">取消</button>
       <button class="btn primary" id="setSave">保存</button>
@@ -1416,11 +1449,6 @@ function openSettings() {
   $("#setCancel").onclick = () => mask.remove();
   mask.onclick = () => mask.remove();
   ttsLoadVoices();
-  const sv = $("#setVoice");
-  if (sv) sv.onchange = (e) => {
-    const v = tts.voices[parseInt(e.target.value)];
-    if (v) { tts.voice = v; localStorage.setItem("tts_voice", v.name); }
-  };
   const af = $("#avFile");
   $("#avUp").onclick = () => af.click();
   af.onchange = async (e) => {
