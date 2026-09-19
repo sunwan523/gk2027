@@ -34,7 +34,7 @@ function ttsLoadVoices() {
   tts.voice = tts.voices.find(v => v.name === saved) || tts.voices[0] || null;
   tts.rate = parseFloat(localStorage.getItem("tts_rate") || "1");
   tts.pitch = parseFloat(localStorage.getItem("tts_pitch") || "1");
-  const sel = $("#ttsVoice");
+  const sel = $("#setVoice") || $("#ttsVoice");
   if (sel) {
     sel.innerHTML = "";
     if (!tts.voices.length) { sel.innerHTML = '<option value="">无中文语音</option>'; return; }
@@ -449,7 +449,6 @@ function renderDeck(points) {
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
         <span class="tts-spd" title="语速">语速</span>
         <input type="range" id="ttsRate" min="0.6" max="1.6" step="0.1" value="${tts.rate}">
-        <select id="ttsVoice" title="朗读声音"></select>
       </div>
     </div>`;
   ttsLoadVoices();
@@ -1314,6 +1313,7 @@ function openSettings() {
     </div>
     <div class="row"><label>昵称</label><input id="setName" class="input" maxlength="12" value="${esc(p.nickname || (me && me.name) || "")}"></div>
     <div class="row"><label>生日</label><input id="setBirth" class="input" type="date" value="${esc(p.birthday || "")}"></div>
+    <div class="row"><label>朗读声音</label><select id="setVoice" class="input"></select></div>
     <div class="btn-row">
       <button class="btn ghost" id="setCancel">取消</button>
       <button class="btn primary" id="setSave">保存</button>
@@ -1322,6 +1322,12 @@ function openSettings() {
   document.body.appendChild(mask);
   $("#setCancel").onclick = () => mask.remove();
   mask.onclick = () => mask.remove();
+  ttsLoadVoices();
+  const sv = $("#setVoice");
+  if (sv) sv.onchange = (e) => {
+    const v = tts.voices[parseInt(e.target.value)];
+    if (v) { tts.voice = v; localStorage.setItem("tts_voice", v.name); }
+  };
   const af = $("#avFile");
   $("#avUp").onclick = () => af.click();
   af.onchange = async (e) => {
