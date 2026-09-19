@@ -97,7 +97,7 @@ button { font-family:inherit; }
 .deck-body {
   padding:20px 14px; min-height:180px; display:flex; align-items:center; justify-content:center;
   background:linear-gradient(135deg,#f8f9ff,#eef2ff); border:1px solid #dce4ff; border-radius:12px;
-  margin-bottom:8px; font-size:15px; line-height:1.8; color:#1a1b1c; text-align:left;
+  margin-bottom:8px; font-size:18px; line-height:1.9; color:#1a1b1c; text-align:left;
 }
 .tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
 .tts-row { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:nowrap; }
@@ -105,6 +105,8 @@ button { font-family:inherit; }
 .tts-play { border:none; background:transparent; color:#5b7cfa; width:44px; height:44px; cursor:pointer; font-size:24px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .tts-play:active { background:#eef1f8; }
 .tts-mini { border:none; background:#eef1f8; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.tts-turn { border:none; background:#eef1f8; color:#4a6bb3; border-radius:14px; padding:0 12px; height:34px; cursor:pointer; font-size:13px; font-weight:600; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.tts-turn:active { opacity:.7; }
 .tts-spd { font-size:11px; color:#666; flex-shrink:0; white-space:nowrap; }
 .tts-row input[type=range] { width:60px; flex-shrink:1; min-width:36px; }
 .tts-rate { font-size:13px; padding:4px 8px; border:1px solid #cfe2ff; border-radius:8px; background:#fff; color:#333; flex-shrink:0; cursor:pointer; }
