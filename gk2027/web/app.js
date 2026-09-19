@@ -430,9 +430,7 @@ function renderDeck(points) {
     </div>
     <div class="deck-body">${esc(points[i])}</div>
     <div class="deck-help">
-      <button class="help-btn ai" id="helpAi">🤖 AI 讲懂</button>
-      <button class="help-btn" id="helpBaidu">🔍 百度</button>
-      <button class="help-btn" id="helpDouyin">📹 抖音视频</button>
+      <button class="help-btn ai" id="helpAi">🤖 这句没懂？AI 讲懂</button>
     </div>
     <div id="aiExplainBox"></div>
     <div class="tts-bar">
@@ -467,14 +465,8 @@ function bindDeck(points) {
       if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); }
     });
   };
-  // 遇到不懂的：AI 讲懂 / 百度 / 抖音
+  // 遇到不懂的：AI 讲懂
   const curText = () => points[deck.idx] || "";
-  const curQuery = () => {
-    const base = (lesson ? lesson.subject + " " + lesson.name + " " : "");
-    return base + curText().replace(/[\s\n]+/g, " ").slice(0, 22);
-  };
-  $("#helpBaidu").onclick = () => window.open("https://www.baidu.com/s?wd=" + encodeURIComponent(curQuery()));
-  $("#helpDouyin").onclick = () => window.open("https://www.douyin.com/search/" + encodeURIComponent(curQuery()));
   $("#helpAi").onclick = async () => {
     const box = $("#aiExplainBox");
     box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
