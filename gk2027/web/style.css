@@ -3,6 +3,11 @@
 .help-btn { width:100%; padding:10px 4px; font-size:14px; border:none; background:#4a90d9; color:#fff; border-radius:8px; cursor:pointer; font-weight:600; }
 .help-btn:active { opacity:.85; }
 .help-btn.mini { width:auto; padding:5px 11px; font-size:12px; border-radius:14px; flex-shrink:0; font-weight:600; }
+.ai-avatar { width:30px; height:30px; border-radius:50%; flex-shrink:0; cursor:pointer; border:none;
+  background:linear-gradient(135deg,#5b7cfa,#7d5cf6); color:#fff; display:flex; align-items:center; justify-content:center;
+  box-shadow:0 2px 6px rgba(91,124,250,.35); padding:0; }
+.ai-avatar span { font-size:10px; font-weight:700; letter-spacing:.5px; }
+.ai-avatar:active { transform:scale(.92); }
 .deck-body { touch-action:pan-y; cursor:grab; user-select:text; -webkit-user-select:text; position:relative; }
 .deck-body:active { cursor:grabbing; }
 .deck-tap { position:absolute; top:0; bottom:0; width:30%; cursor:pointer; -webkit-tap-highlight-color:transparent; }

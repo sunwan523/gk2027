@@ -433,7 +433,7 @@ function renderDeck(points) {
     <div class="deck-progress">
       <div class="bar"><div style="width:${Math.round((i + 1) / points.length * 100)}%"></div></div>
       <span>${i + 1}/${points.length}</span>
-      <button class="help-btn ai mini" id="helpAi" title="这句没懂？让 AI 讲懂">🧑🏫 AI</button>
+      <button class="ai-avatar" id="helpAi" title="这句没懂？让 AI 讲懂"><span>AI</span></button>
     </div>
     <div class="deck-body" id="deckBody">
       ${esc(points[i])}
