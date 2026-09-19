@@ -408,14 +408,12 @@ function renderLesson() {
       </div>
       <div id="deckWrap"></div>
       <div id="aiExplainBox"></div>
-      <div class="btn-row deck-cta">
-        <button class="btn primary" id="toQuiz">开始练习 ✏️</button>
-        <button class="btn ghost" id="skipQuiz">跳过</button>
+      <div class="deck-cta">
+        <button class="btn light" id="toQuiz">开始练习 ✏️</button>
       </div>`;
     renderDeck(L.points);
     $("#exitLearn").onclick = exitToLearn;
     $("#toQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
-    $("#skipQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
     $("#helpAi").onclick = async () => {
       const box = $("#aiExplainBox");
       box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
@@ -571,7 +569,7 @@ function renderDeck(points) {
       <div class="deck-tap left" id="deckTapL" title="上一张"></div>
       <div class="deck-tap right" id="deckTapR" title="下一张"></div>
     </div>
-    <div class="tts-bar">
+    <div class="deck-player">
       <div class="tts-row">
         <span class="tts-side">
           <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
