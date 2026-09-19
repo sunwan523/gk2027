@@ -102,6 +102,7 @@ if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
 
 function ttsSpeak(texts, onDone) {
   tts.queue = texts; tts.idx = 0; tts.onDone = onDone || null;
+  lockScreen();
   if (!texts.length) return;
   if (ttsUseOnline()) { ttsStopAudio(); ttsSayOnline(0); }
   else { window.speechSynthesis.cancel(); ttsSay(0); }
@@ -116,7 +117,7 @@ function ttsSay(i) {
   if (pv && pv.obj) u.voice = pv.obj;
   u.onend = () => {
     if (tts.idx < tts.queue.length - 1) { ttsSay(tts.idx + 1); }
-    else { tts.playing = false; syncPlayBtn(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
+    else { tts.playing = false; syncPlayBtn(); unlockScreen(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
   };
   u.onerror = () => { tts.playing = false; syncPlayBtn(); };
   window.speechSynthesis.speak(u);
@@ -141,7 +142,7 @@ async function ttsSayOnline(i) {
     tts.audio = new Audio(url);
     tts.audio.onended = () => {
       if (tts.idx < tts.queue.length - 1) { ttsSayOnline(tts.idx + 1); }
-      else { tts.playing = false; syncPlayBtn(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
+      else { tts.playing = false; syncPlayBtn(); unlockScreen(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
     };
     tts.audio.onerror = () => { tts.playing = false; syncPlayBtn(); };
     tts.audio.play().catch(() => { tts.playing = false; syncPlayBtn(); });
@@ -168,17 +169,37 @@ function ttsToggle() {
   if (tts.playing) {
     if (ttsUseOnline()) { if (tts.audio) tts.audio.pause(); tts.playing = false; syncPlayBtn(); }
     else { window.speechSynthesis.pause(); tts.playing = false; syncPlayBtn(); }
+    unlockScreen();
   } else if (ttsUseOnline()) {
+    lockScreen();
     if (tts.audio && !tts.audio.ended) { tts.audio.play().catch(() => {}); tts.playing = true; syncPlayBtn(); }
     else ttsSayOnline(tts.idx);
-  } else if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); tts.playing = true; syncPlayBtn(); }
-  else ttsSay(tts.idx);
+  } else if (window.speechSynthesis.paused) { lockScreen(); window.speechSynthesis.resume(); tts.playing = true; syncPlayBtn(); }
+  else { lockScreen(); ttsSay(tts.idx); }
 }
-function ttsStop() { ttsStopAudio(); window.speechSynthesis.cancel(); tts.playing = false; syncPlayBtn(); }
+function ttsStop() { ttsStopAudio(); window.speechSynthesis.cancel(); tts.playing = false; syncPlayBtn(); unlockScreen(); }
 function syncPlayBtn() {
   const b = $("#ttsPlay");
   if (b) b.textContent = tts.playing ? "❚❚" : "▶";
 }
+
+// ---------- 防锁屏：朗读时保持屏幕常亮（需 HTTPS 安全域） ----------
+let wakeLock = null;
+async function lockScreen() {
+  try {
+    if (!("wakeLock" in navigator)) return false;
+    if (wakeLock) return true;
+    wakeLock = await navigator.wakeLock.request("screen");
+    wakeLock.addEventListener("release", () => { wakeLock = null; });
+    return true;
+  } catch (e) { return false; }
+}
+function unlockScreen() {
+  try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && tts.playing) lockScreen();
+});
 
 // ---------- 埋点：切页/离开时上报停留时长（上限5分钟） ----------
 let act = { page: "浏览", subject: "", kp_id: "", ts: Date.now() };
