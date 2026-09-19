@@ -832,14 +832,18 @@ async function renderSpace() {
   const nm = (me && me.nickname) || (me && me.name) || "";
   const av = (profile && profile.avatar) || (me && me.avatar) || "";
   const bd = (profile && profile.birthday) || "";
+  const cover = (profile && profile.cover) || "";
   el.innerHTML = `
-  <div class="qq-cover">
+  <div class="qq-cover${cover ? " has-cover" : ""}"${cover ? ` style="background-image:url('/${esc(cover)}')"` : ""}>
+    <div class="cover-mask"></div>
     <div class="cover-deco d1"></div><div class="cover-deco d2"></div><div class="cover-deco d3"></div>
     <div class="cover-ava">${av ? `<img src="/${esc(av)}" alt="">` : esc(String(nm).slice(0, 1) || "我")}</div>
     <div class="cover-name">${esc(nm || "同学")}</div>
     <div class="cover-sig">${bd ? "🎂 " + esc(bd) + " · " : ""}坚持复习，每天进步一点点</div>
-    <button class="cover-edit" onclick="openSettings()">✏️ 编辑资料</button>
+    <button class="cover-edit" id="coverUpBtn" title="更换封面图">🖼 换封面</button>
+    <button class="cover-edit" style="right:86px;" onclick="openSettings()">✏️ 编辑资料</button>
     <div class="cover-badge">🔥 连签 ${month.streak} 天</div>
+    <input type="file" id="coverFile" accept="image/*" style="display:none">
   </div>
 
   ${space.priv.unlocked ? `<div class="priv-tip"><span>🔓</span> 隐秘空间已解锁（30分钟内有效）</div>` : ""}
@@ -1008,6 +1012,22 @@ function renderPrivCard() {
 }
 
 function bindSpaceEvents() {
+  // 换封面
+  const cub = $("#coverUpBtn"), cvf = $("#coverFile");
+  if (cub) cub.onclick = (e) => { e.stopPropagation(); if (cvf) cvf.click(); };
+  if (cvf) cvf.onchange = async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const d = await fileToDataURL(f);
+    if (!d.startsWith("data:image/")) { toast("请选择图片"); return; }
+    try {
+      const img = await compressImg(d, 1280);
+      await post("/api/profile/cover", { data: img });
+      toast("封面已更新");
+      renderSpace();
+    } catch (err) { toast(err.message); }
+  };
+
   // 签到（自拍 + 心情合一）
   const sc = $("#signCam");
   if (sc) sc.onclick = () => {

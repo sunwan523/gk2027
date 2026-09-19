@@ -36,6 +36,7 @@ def create_tables(conn):
         nickname TEXT DEFAULT '',
         birthday TEXT DEFAULT '',
         avatar_path TEXT DEFAULT '',
+        cover_path TEXT DEFAULT '',
         private_pwd TEXT DEFAULT '',
         updated_at TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS diary (
@@ -61,6 +62,13 @@ def create_tables(conn):
         note TEXT DEFAULT '',
         created_at TEXT,
         PRIMARY KEY(uid, date))""")
+    # 兼容旧库：profile 缺 cover_path 列时补充
+    try:
+        cols = [r["name"] for r in conn.execute("PRAGMA table_info(profile)")]
+        if "cover_path" not in cols:
+            conn.execute("ALTER TABLE profile ADD COLUMN cover_path TEXT DEFAULT ''")
+    except Exception:
+        pass
     conn.commit()
 
 
@@ -195,18 +203,19 @@ def verify_private_pwd(conn, uid: str, pwd: str):
 # 用户设置
 # ----------------------------------------------------------------------
 def get_profile(conn, uid: str) -> dict:
-    row = conn.execute("SELECT nickname,birthday,avatar_path,private_pwd FROM profile WHERE uid=?", (uid,)).fetchone()
+    row = conn.execute("SELECT nickname,birthday,avatar_path,cover_path,private_pwd FROM profile WHERE uid=?", (uid,)).fetchone()
     return {"nickname": row["nickname"] if row else "",
             "birthday": row["birthday"] if row else "",
             "avatar": row["avatar_path"] if row else "",
+            "cover": row["cover_path"] if row else "",
             "private_enabled": bool(row and row["private_pwd"])}
 
 
-def save_profile(conn, uid: str, nickname: str = "", birthday: str = "") -> dict:
-    conn.execute("""INSERT INTO profile(uid,nickname,birthday,updated_at) VALUES(?,?,?,?)
-                    ON CONFLICT(uid) DO UPDATE SET nickname=?, birthday=?, updated_at=?""",
-                 (uid, (nickname or "").strip()[:20], (birthday or "").strip()[:10], _now(),
-                  (nickname or "").strip()[:20], (birthday or "").strip()[:10], _now()))
+def save_profile(conn, uid: str, nickname: str = "", birthday: str = "", cover_path: str = "") -> dict:
+    conn.execute("""INSERT INTO profile(uid,nickname,birthday,cover_path,updated_at) VALUES(?,?,?,?,?)
+                    ON CONFLICT(uid) DO UPDATE SET nickname=?, birthday=?, cover_path=?, updated_at=?""",
+                 (uid, (nickname or "").strip()[:20], (birthday or "").strip()[:10], cover_path, _now(),
+                  (nickname or "").strip()[:20], (birthday or "").strip()[:10], cover_path, _now()))
     conn.commit()
     return get_profile(conn, uid)
 
@@ -220,6 +229,18 @@ def set_avatar(conn, uid: str, data_url: str) -> str:
     conn.commit()
     if old and old["avatar_path"] and old["avatar_path"] != p:
         delete_photos([old["avatar_path"]])
+    return p
+
+
+def set_cover(conn, uid: str, data_url: str) -> str:
+    p = save_photo(uid, "cover", "", data_url)
+    old = conn.execute("SELECT cover_path FROM profile WHERE uid=?", (uid,)).fetchone()
+    conn.execute("""INSERT INTO profile(uid,cover_path,updated_at) VALUES(?,?,?)
+                    ON CONFLICT(uid) DO UPDATE SET cover_path=?, updated_at=?""",
+                 (uid, p, _now(), p, _now()))
+    conn.commit()
+    if old and old["cover_path"] and old["cover_path"] != p:
+        delete_photos([old["cover_path"]])
     return p
 
 

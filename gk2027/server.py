@@ -539,7 +539,8 @@ async def api_profile_save(req: Request):
     body = await req.json() or {}
     return diary_mod.save_profile(c, u["id"],
                                   nickname=body.get("nickname", ""),
-                                  birthday=body.get("birthday", ""))
+                                  birthday=body.get("birthday", ""),
+                                  cover_path=body.get("cover", ""))
 
 
 @app.post("/api/profile/avatar")
@@ -551,6 +552,19 @@ async def api_profile_avatar(req: Request):
     try:
         p = diary_mod.set_avatar(c, u["id"], body.get("data", ""))
         return {"ok": True, "avatar": p}
+    except ValueError as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/profile/cover")
+async def api_profile_cover(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    try:
+        p = diary_mod.set_cover(c, u["id"], body.get("data", ""))
+        return {"ok": True, "cover": p}
     except ValueError as e:
         return JSONResponse({"error": str(e)}, status_code=400)
 

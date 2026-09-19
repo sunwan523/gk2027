@@ -263,6 +263,12 @@ textarea.input { min-height:84px; resize:vertical; }
   background:linear-gradient(135deg,#5b7cfa 0%,#7d5cf6 55%,#a06bf5 100%);
   color:#fff; margin-bottom:14px; box-shadow:0 6px 18px rgba(91,124,250,.25); }
 .cover-deco { position:absolute; border-radius:50%; background:rgba(255,255,255,.12); }
+.qq-cover.has-cover { background-size:cover; background-position:center; }
+.qq-cover.has-cover .cover-mask { position:absolute; inset:0; background:linear-gradient(180deg,rgba(30,40,90,.25),rgba(30,40,90,.55)); }
+.qq-cover.has-cover .cover-deco { display:none; }
+.qq-cover.has-cover .cover-ava, .qq-cover.has-cover .cover-name, .qq-cover.has-cover .cover-sig,
+.qq-cover.has-cover .cover-badge { position:relative; z-index:1; }
+.qq-cover.has-cover .cover-edit { z-index:2; }
 .cover-deco.d1 { width:120px; height:120px; top:-40px; left:-30px; }
 .cover-deco.d2 { width:70px; height:70px; bottom:-20px; right:28px; background:rgba(255,255,255,.08); }
 .cover-deco.d3 { width:34px; height:34px; top:18px; right:70px; background:rgba(255,255,255,.18); }
