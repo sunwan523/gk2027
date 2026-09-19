@@ -21,6 +21,10 @@ sys.path.insert(0, BASE)
 from config import PUBLIC_URL, SERVER_PORT
 PORT = SERVER_PORT
 PID_FILE = os.path.join(BASE, "data", "mobile.pid")
+HTTPS_PID_FILE = os.path.join(BASE, "data", "mobile_https.pid")
+HTTPS_PORT = 8443
+CERT_FILE = os.path.join(BASE, "data", "certs", "cert.pem")
+KEY_FILE = os.path.join(BASE, "data", "certs", "key.pem")
 LOG_FILE = os.path.join(BASE, "logs", "mobile.log")
 PY = sys.executable.replace("pythonw.exe", "python.exe")
 PYW = os.path.join(os.path.dirname(PY), "pythonw.exe")
@@ -88,10 +92,22 @@ def cmd_start() -> int:
         stdout=log, stderr=log, cwd=BASE, env=env, creationflags=DETACHED,
         close_fds=True)
     open(PID_FILE, "w").write(str(proc.pid))
+    # HTTPS 实例（8443，自签证书）：手机访问 https://IP:8443 后
+    # 放行证书即可获得安全域，Wake Lock 防锁屏朗读生效
+    proc2 = None
+    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        proc2 = subprocess.Popen(
+            [PY, "-m", "uvicorn", APP,
+             "--host", "0.0.0.0", "--port", str(HTTPS_PORT),
+             "--ssl-certfile", CERT_FILE, "--ssl-keyfile", KEY_FILE],
+            stdout=log, stderr=log, cwd=BASE, env=env, creationflags=DETACHED,
+            close_fds=True)
+        open(HTTPS_PID_FILE, "w").write(str(proc2.pid))
     for _ in range(30):
         if _health():
             print("已启动（PID %d）" % proc.pid)
             print("局域网：http://%s:%d" % (_lan_ip(), PORT))
+            print("防锁屏：https://%s:%d（浏览器放行证书后朗读不锁屏）" % (_lan_ip(), HTTPS_PORT))
             print("外网：%s" % PUBLIC_URL)
             return 0
         time.sleep(0.6)
@@ -111,7 +127,13 @@ def cmd_stop() -> int:
     subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"],
                    capture_output=True)
     try:
+        hpid = int(open(HTTPS_PID_FILE).read().strip())
+        subprocess.run(["taskkill", "/PID", str(hpid), "/T", "/F"], capture_output=True)
+    except OSError:
+        pass
+    try:
         os.remove(PID_FILE)
+        os.remove(HTTPS_PID_FILE)
     except OSError:
         pass
     print("已停止（PID %d）。" % pid)
@@ -133,6 +155,7 @@ def cmd_status() -> int:
     if alive:
         print("● 运行中   PID %d   端口 %d" % (pid, PORT))
         print("  局域网： http://%s:%d" % (_lan_ip(), PORT))
+        print("  防锁屏： https://%s:%d" % (_lan_ip(), HTTPS_PORT))
         print("  外网：   %s" % PUBLIC_URL)
         print("  日志：   %s" % LOG_FILE)
     else:
