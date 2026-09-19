@@ -237,7 +237,8 @@ async function refreshHeader() {
       `<span class="h-stat">🔥 ${d.streak} 天</span>` +
       `<span class="h-stat">🏆 ${d.mastered}/${d.total}</span>` +
       `<span class="h-xp">今日 XP ${d.xp_today}/${d.xp_goal} ${d.goal_done ? "✅" : ""}` +
-      `<div class="xp-bar"><div style="width:${d.ratio}%"></div></div></span>`;
+      `<div class="xp-bar"><div style="width:${d.ratio}%"></div></div></span>` +
+      `<span class="h-dday" title="高考倒计时">⏳ ${gaokaoCountdown()}</span>`;
   } catch (e) { /* 忽略 */ }
 }
 
@@ -317,6 +318,15 @@ async function renderLearn() {
   } catch (e) {
     $("#lessonList").innerHTML = `<div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`;
   }
+}
+function gaokaoCountdown() {
+  try {
+    const now = new Date();
+    const exam = new Date(now.getFullYear() + "-06-07T00:00:00");
+    if (now > exam) exam.setFullYear(exam.getFullYear() + 1);
+    const days = Math.ceil((exam - now) / 86400000);
+    return `高考还有 ${days} 天`;
+  } catch (e) { return ""; }
 }
 function iconOf(status) {
   return { "可学": "▶️", "学习中": "🔶", "需复习": "🔁", "已掌握": "✅", "未解锁": "🔒" }[status] || "▶️";
@@ -563,12 +573,14 @@ function renderDeck(points) {
     </div>
     <div class="tts-bar">
       <div class="tts-row">
-        <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
+        <span class="tts-side">
+          <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
+          <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
+        </span>
         <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
-        <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
-        <span class="tts-right">
-          <button class="tts-turn" id="deckPrev" title="上一张">上一页</button>
-          <button class="tts-turn" id="deckNext" title="下一张">下一页</button>
+        <span class="tts-side tts-right">
+          <button class="tts-turn" id="deckPrev" title="上一张">↑ 上一页</button>
+          <button class="tts-turn" id="deckNext" title="下一张">↓ 下一页</button>
         </span>
       </div>
       <div class="tts-pop" id="ttsRatePop" hidden>

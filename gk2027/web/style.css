@@ -81,6 +81,7 @@ button { font-family:inherit; }
 
 /* ---------- 课程列表 ---------- */
 .subj-filter { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+.h-dday { flex-shrink:0; font-size:12px; font-weight:700; color:#e67e22; background:#fdf1e3; border:1px solid #f6d9b8; border-radius:12px; padding:3px 8px; white-space:nowrap; }
 .subj-filter button { padding:5px 12px; font-size:13px; border-radius:16px; border:1px solid #ddd; background:#fff; cursor:pointer; }
 .subj-filter button.active { background:#4a90d9; color:#fff; border-color:#4a90d9; }
 .lesson-card { background:#fff; border:1px solid #e8e9ef; border-radius:12px; padding:12px 14px; margin-bottom:8px; display:flex; align-items:center; gap:10px; }
@@ -100,8 +101,9 @@ button { font-family:inherit; }
   margin-bottom:8px; font-size:18px; line-height:1.9; color:#1a1b1c; text-align:left;
 }
 .tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
-.tts-row { display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:nowrap; position:relative; }
-.tts-right { display:flex; gap:8px; margin-left:auto; }
+.tts-row { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; position:relative; }
+.tts-side { display:flex; align-items:center; justify-content:flex-end; gap:8px; flex:1; min-width:0; }
+.tts-side.tts-right { justify-content:flex-start; flex-direction:column; gap:6px; align-items:flex-start; }
 .tts-bar { position:relative; }
 .deck-cta { position:fixed; left:0; right:0; bottom:66px; max-width:720px; margin:0 auto; padding:0 12px; gap:10px; z-index:46; }
 #deckWrap { padding-bottom:96px; }
