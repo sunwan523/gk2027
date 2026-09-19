@@ -296,6 +296,27 @@ async def api_ai_quiz(req: Request):
         return JSONResponse({"error": "AI出题失败：%s" % str(e)[:200]}, status_code=500)
 
 
+@app.post("/api/ai_explain")
+async def api_ai_explain(req: Request):
+    from core import explain
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    text = (body.get("text") or "").strip()
+    kp_id = body.get("kp_id", "")
+    if not text:
+        return JSONResponse({"error": "缺少要讲解的内容"}, status_code=400)
+    subject, name = "", ""
+    if kp_id:
+        row = c.execute("SELECT subject, name FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
+        if row:
+            subject, name = row["subject"], row["name"]
+    try:
+        return {"explain": explain.explain_point(subject, name, text)}
+    except Exception as e:
+        return JSONResponse({"error": "AI讲解失败：%s" % str(e)[:200]}, status_code=500)
+
 # ----------------------------------------------------------------------
 # 学习统计 + AI 建议
 # ----------------------------------------------------------------------

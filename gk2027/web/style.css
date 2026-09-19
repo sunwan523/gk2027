@@ -1,3 +1,13 @@
+/* 遇到不懂的：AI讲解/百度/抖音 */
+.deck-help { display:flex; gap:6px; margin:4px 0 8px; flex-wrap:wrap; }
+.help-btn { flex:1; min-width:88px; padding:8px 4px; font-size:13px; border:1px solid #dfe6ff; background:#f5f8ff; color:#2b4a8f; border-radius:8px; cursor:pointer; }
+.help-btn.ai { background:#4a90d9; color:#fff; border-color:#4a90d9; font-weight:600; }
+.ai-explain { background:#fffdf5; border:1px solid #f0e2b8; border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.8; margin-bottom:8px; }
+.ae-head { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:6px; font-size:13px; flex-wrap:wrap; }
+.ae-speak { background:#fff; border:1px solid #f0e2b8; border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; }
+.ae-close { margin-left:auto; background:none; border:none; font-size:15px; cursor:pointer; color:#999; }
+.ae-body h3 { font-size:14px; margin:6px 0 3px; }
+.ae-body ul, .ae-body ol { padding-left:18px; }
 /* 课程卡片按钮区：继续 + 重学 */
 .lc-actions { display:flex; gap:6px; flex-shrink:0; }
 .lc-restart { padding:8px 12px; font-size:13px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#888; cursor:pointer; }

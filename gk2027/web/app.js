@@ -429,6 +429,12 @@ function renderDeck(points) {
       <span>${i + 1}/${points.length}</span>
     </div>
     <div class="deck-body">${esc(points[i])}</div>
+    <div class="deck-help">
+      <button class="help-btn ai" id="helpAi">🤖 AI 讲懂</button>
+      <button class="help-btn" id="helpBaidu">🔍 百度</button>
+      <button class="help-btn" id="helpDouyin">📹 抖音视频</button>
+    </div>
+    <div id="aiExplainBox"></div>
     <div class="tts-bar">
       <div class="tts-row">
         <button class="tts-mini" id="deckPrev">⏮ 上一条</button>
@@ -460,6 +466,34 @@ function bindDeck(points) {
     ttsSpeak(points.slice(deck.idx), () => {
       if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); }
     });
+  };
+  // 遇到不懂的：AI 讲懂 / 百度 / 抖音
+  const curText = () => points[deck.idx] || "";
+  const curQuery = () => {
+    const base = (lesson ? lesson.subject + " " + lesson.name + " " : "");
+    return base + curText().replace(/[\s\n]+/g, " ").slice(0, 22);
+  };
+  $("#helpBaidu").onclick = () => window.open("https://www.baidu.com/s?wd=" + encodeURIComponent(curQuery()));
+  $("#helpDouyin").onclick = () => window.open("https://www.douyin.com/search/" + encodeURIComponent(curQuery()));
+  $("#helpAi").onclick = async () => {
+    const box = $("#aiExplainBox");
+    box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
+    try {
+      const d = await post("/api/ai_explain", { kp_id: lesson ? lesson.kp_id : "", text: curText() });
+      const plain = (d.explain || "").trim();
+      box.innerHTML = `<div class="ai-explain">
+        <div class="ae-head">🤖 AI 讲懂 · ${esc(lesson ? lesson.name : "")}
+          <button class="ae-speak" id="aeSpeak">🔊 朗读讲解</button>
+          <button class="ae-close" id="aeClose">✕</button></div>
+        <div class="ae-body">${markdownish(plain)}</div></div>`;
+      $("#aeClose").onclick = () => { box.innerHTML = ""; ttsStop(); };
+      $("#aeSpeak").onclick = () => {
+        const paras = plain.split(/\n+/).map(x => x.replace(/^[-*•#\s]+/, "").trim()).filter(Boolean);
+        if (paras.length) ttsSpeak(paras);
+      };
+    } catch (e) {
+      box.innerHTML = `<div class="fb-wrong">${esc(e.message)}</div>`;
+    }
   };
 }
 // ---------- AI 出题 ----------
