@@ -26,25 +26,40 @@ async function api(path, opts) {
 }
 const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(body || {}) });
 
-// ---------- 朗读（Web Speech API，中文） ----------
-let tts = { voices: [], voice: null, rate: 1, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null };
+// ---------- 朗读（在线 Edge TTS 优先，系统语音后备） ----------
+let tts = { voices: [], voice: null, rate: 1, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
+function fillVoiceSel() {
+  const sel = $("#setVoice") || $("#ttsVoice");
+  if (!sel) return;
+  sel.innerHTML = "";
+  if (!tts.voices.length) { sel.innerHTML = '<option value="">无可用语音</option>'; return; }
+  tts.voices.forEach((v, i) => {
+    const o = document.createElement("option");
+    o.value = i; o.text = v.name;
+    sel.appendChild(o);
+    if (tts.voice && v.name === tts.voice.name) sel.value = i;
+  });
+}
 function ttsLoadVoices() {
-  tts.voices = (window.speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().indexOf("zh") >= 0);
-  const saved = localStorage.getItem("tts_voice");
-  tts.voice = tts.voices.find(v => v.name === saved) || tts.voices[0] || null;
   tts.rate = parseFloat(localStorage.getItem("tts_rate") || "1");
   tts.pitch = parseFloat(localStorage.getItem("tts_pitch") || "1");
-  const sel = $("#setVoice") || $("#ttsVoice");
-  if (sel) {
-    sel.innerHTML = "";
-    if (!tts.voices.length) { sel.innerHTML = '<option value="">无中文语音</option>'; return; }
-    tts.voices.forEach((v, i) => {
-      const o = document.createElement("option");
-      o.value = i; o.text = v.name + (v.default ? " (默认)" : "");
-      sel.appendChild(o);
-      if (tts.voice && v.name === tts.voice.name) sel.value = i;
-    });
-  }
+  const saved = localStorage.getItem("tts_voice") || "";
+  const sysVoices = (window.speechSynthesis.getVoices() || []).filter(v => v.lang && v.lang.toLowerCase().indexOf("zh") >= 0);
+  const pick = () => { tts.voice = tts.voices.find(v => v.name === saved) || tts.voices[0] || null; fillVoiceSel(); };
+  // 系统语音先占位
+  tts.voices = sysVoices.map(v => ({ name: "系统·" + v.name, obj: v, online: false }));
+  pick();
+  // 拉取在线音色（更丰富、音质更好）
+  try {
+    fetch("/api/tts_voices").then(r => r.json()).then(d => {
+      tts.online = d.voices || [];
+      tts.voices = [
+        ...tts.online.map(v => ({ name: "🎧 " + v.name, short: v.short, online: true })),
+        ...sysVoices.map(v => ({ name: "系统·" + v.name, obj: v, online: false })),
+      ];
+      pick();
+    }).catch(() => {});
+  } catch (e) {}
 }
 if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
   speechSynthesis.onvoiceschanged = ttsLoadVoices;
@@ -53,16 +68,16 @@ if (window.speechSynthesis && speechSynthesis.onvoiceschanged !== undefined) {
 function ttsSpeak(texts, onDone) {
   tts.queue = texts; tts.idx = 0; tts.onDone = onDone || null;
   if (!texts.length) return;
-  window.speechSynthesis.cancel();
-  ttsSay(0);
+  if (tts.voice && tts.voice.online) { ttsStopAudio(); ttsSayOnline(0); }
+  else { window.speechSynthesis.cancel(); ttsSay(0); }
 }
 function ttsSay(i) {
   if (i < 0 || i >= tts.queue.length) return;
-  tts.idx = i; tts.playing = true;
+  tts.idx = i; tts.playing = true; syncPlayBtn();
   window.speechSynthesis.cancel();
   const u = new SpeechSynthesisUtterance(tts.queue[i]);
   u.lang = "zh-CN"; u.rate = tts.rate; u.pitch = tts.pitch;
-  if (tts.voice) u.voice = tts.voice;
+  if (tts.voice && tts.voice.obj) u.voice = tts.voice.obj;
   u.onend = () => {
     if (tts.idx < tts.queue.length - 1) { ttsSay(tts.idx + 1); }
     else { tts.playing = false; syncPlayBtn(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
@@ -70,12 +85,52 @@ function ttsSay(i) {
   u.onerror = () => { tts.playing = false; syncPlayBtn(); };
   window.speechSynthesis.speak(u);
 }
+async function ttsSayOnline(i) {
+  if (i < 0 || i >= tts.queue.length) return;
+  tts.idx = i; tts.playing = true; syncPlayBtn();
+  const text = tts.queue[i];
+  if (!tts.voice || !tts.voice.short) { fallbackToSys(i); return; }
+  try {
+    const rateStr = (tts.rate >= 1 ? "+" : "") + Math.round((tts.rate - 1) * 100) + "%";
+    const r = await fetch("/api/tts", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: text.slice(0, 1500), voice: tts.voice.short, rate: rateStr }),
+    });
+    if (!r.ok) throw new Error();
+    const blob = await r.blob();
+    if (tts.idx !== i) return;
+    const url = URL.createObjectURL(blob);
+    tts.audio = new Audio(url);
+    tts.audio.onended = () => {
+      if (tts.idx < tts.queue.length - 1) { ttsSayOnline(tts.idx + 1); }
+      else { tts.playing = false; syncPlayBtn(); if (tts.onDone) { const f = tts.onDone; tts.onDone = null; f(); } }
+    };
+    tts.audio.onerror = () => { tts.playing = false; syncPlayBtn(); };
+    tts.audio.play().catch(() => { tts.playing = false; syncPlayBtn(); });
+  } catch (e) {
+    fallbackToSys(i);
+  }
+}
+function fallbackToSys(i) {
+  const sys = tts.voices.find(v => !v.online) || null;
+  if (sys) { tts.voice = sys; localStorage.setItem("tts_voice", sys.name); try { toast("在线语音暂不可用，已切换系统语音"); } catch (e) {} }
+  tts.playing = false;
+  window.speechSynthesis.cancel();
+  ttsSay(i);
+}
+function ttsStopAudio() {
+  if (tts.audio) { tts.audio.pause(); tts.audio = null; }
+}
 function ttsToggle() {
-  if (tts.playing) { window.speechSynthesis.pause(); tts.playing = false; syncPlayBtn(); }
-  else if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); tts.playing = true; syncPlayBtn(); }
+  if (tts.playing) {
+    if (tts.voice && tts.voice.online) { if (tts.audio) tts.audio.pause(); tts.playing = false; syncPlayBtn(); }
+    else { window.speechSynthesis.pause(); tts.playing = false; syncPlayBtn(); }
+  } else if (tts.voice && tts.voice.online) {
+    if (tts.audio) { tts.audio.play().catch(() => {}); tts.playing = true; syncPlayBtn(); }
+  } else if (window.speechSynthesis.paused) { window.speechSynthesis.resume(); tts.playing = true; syncPlayBtn(); }
   else ttsSay(tts.idx);
 }
-function ttsStop() { window.speechSynthesis.cancel(); tts.playing = false; syncPlayBtn(); }
+function ttsStop() { ttsStopAudio(); window.speechSynthesis.cancel(); tts.playing = false; syncPlayBtn(); }
 function syncPlayBtn() {
   const b = $("#ttsPlay");
   if (b) b.textContent = tts.playing ? "⏸" : "▶️";
@@ -460,7 +515,8 @@ function bindDeck(points) {
   $("#deckNext").onclick = () => { ttsStop(); deck.idx = Math.min(points.length - 1, deck.idx + 1); renderDeck(points); };
   $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
   $("#ttsRate").oninput = (e) => { tts.rate = parseFloat(e.target.value); localStorage.setItem("tts_rate", String(tts.rate)); };
-  $("#ttsVoice").onchange = (e) => {
+  const tv = $("#ttsVoice");
+  if (tv) tv.onchange = (e) => {
     const v = tts.voices[parseInt(e.target.value)];
     if (v) { tts.voice = v; localStorage.setItem("tts_voice", v.name); }
   };

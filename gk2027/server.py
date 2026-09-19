@@ -25,6 +25,11 @@ from fastapi.staticfiles import StaticFiles
 from config import SUBJECTS, ATTRIBUTIONS
 from core import db, graph, queue, content, users, ai_quiz, study_advisor
 
+try:
+    import edge_tts  # 在线语音（微软 Edge TTS，音色丰富）
+except Exception:
+    edge_tts = None
+
 app = FastAPI(title="高考复习", docs_url=None, redoc_url=None)
 
 WEB_DIR = os.path.join(BASE, "web")
@@ -61,6 +66,58 @@ def _conn_for(req: Request):
     if not u:
         return None, None
     return _conn(u["id"]), u
+
+
+# ----------------------------------------------------------------------
+# 在线朗读（Edge TTS）
+# ----------------------------------------------------------------------
+TTS_VOICES = [
+    {"short": "zh-CN-XiaoxiaoNeural", "name": "晓晓 · 温柔女声"},
+    {"short": "zh-CN-XiaoyiNeural", "name": "晓伊 · 自然女声"},
+    {"short": "zh-CN-YunxiNeural", "name": "云希 · 阳光男声"},
+    {"short": "zh-CN-YunjianNeural", "name": "云健 · 浑厚男声"},
+    {"short": "zh-CN-YunyangNeural", "name": "云扬 · 新闻男声"},
+    {"short": "zh-CN-YunxiaNeural", "name": "云夏 · 少年男声"},
+    {"short": "zh-TW-HsiaoChenNeural", "name": "曉臻 · 台湾女声"},
+]
+_TTS_CACHE: dict = {}
+
+
+@app.get("/api/tts_voices")
+async def api_tts_voices():
+    return {"voices": TTS_VOICES}
+
+
+@app.post("/api/tts")
+async def api_tts(req: Request):
+    body = await req.json() or {}
+    text = (body.get("text") or "").strip()
+    voice = body.get("voice") or "zh-CN-XiaoxiaoNeural"
+    rate = body.get("rate") or "+0%"
+    if not text:
+        return JSONResponse({"error": "文本为空"}, status_code=400)
+    if len(text) > 1500:
+        text = text[:1500]
+    if edge_tts is None:
+        return JSONResponse({"error": "在线语音组件未安装"}, status_code=501)
+    key = (voice, rate, text)
+    if key in _TTS_CACHE:
+        return Response(content=_TTS_CACHE[key], media_type="audio/mpeg")
+    try:
+        buf = bytearray()
+        comm = edge_tts.Communicate(text, voice, rate=rate)
+        async for chunk in comm.stream():
+            if chunk["type"] == "audio":
+                buf.extend(chunk["data"])
+        if not buf:
+            return JSONResponse({"error": "语音生成失败，请稍后重试"}, status_code=502)
+        data = bytes(buf)
+        if len(_TTS_CACHE) > 200:
+            _TTS_CACHE.clear()
+        _TTS_CACHE[key] = data
+        return Response(content=data, media_type="audio/mpeg")
+    except Exception as e:
+        return JSONResponse({"error": "在线语音暂不可用（可改用系统音色）"}, status_code=502)
 
 
 # ----------------------------------------------------------------------
