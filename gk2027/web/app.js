@@ -93,6 +93,7 @@ function reportAct(page, subject, kp_id) {
   act = { page: page || "浏览", subject: subject || "", kp_id: kp_id || "", ts: now };
 }
 window.addEventListener("beforeunload", () => {
+  saveProgress();
   const secs = Math.round((Date.now() - act.ts) / 1000);
   if (secs >= 1 && secs <= 300) {
     const body = JSON.stringify({ page: act.page, subject: act.subject, kp_id: act.kp_id, seconds: secs });
@@ -180,6 +181,7 @@ async function renderLearn() {
     `<div id="lessonList"><div class="spinner">加载中…</div></div>`;
   el.querySelectorAll(".subj-filter button").forEach(b => b.onclick = () => { learnSubj = b.dataset.s; renderLearn(); });
   try {
+    const saved = loadProgress();
     const d = await api("/api/lessons?subject=" + encodeURIComponent(learnSubj));
     const list = $("#lessonList");
     if (!list) return;
@@ -197,7 +199,7 @@ async function renderLearn() {
           <div class="lc-name">${iconOf(l.status)} ${esc(l.subject)}·${esc(l.name)}</div>
           <div class="lc-sub">掌握度 ${l.mastery}%｜自检题 ${l.q_done}/${l.q_total}｜约 ${l.minutes} 分钟</div>
         </div>
-        <button class="lc-go" data-kp="${esc(l.kp_id)}">开始</button>
+        <button class="lc-go" data-kp="${esc(l.kp_id)}">${(saved && saved.kp_id === l.kp_id) ? "继续 ▶" : "开始"}</button>
       </div>`).join("");
     list.querySelectorAll(".lc-go").forEach(b => b.onclick = () => startLesson(b.dataset.kp));
     reportAct("学习", learnSubj === "全部" ? "" : learnSubj, "");
@@ -213,13 +215,46 @@ function iconOf(status) {
 async function startLesson(kpId) {
   try {
     const d = await post("/api/lesson/start", { kp_id: kpId });
+    const saved = loadProgress();
+    const has = saved && saved.kp_id === kpId && saved.phase !== "done";
+    let phase = has ? (saved.phase === "fb" ? "q" : saved.phase) : "learn";
+    let idx = has ? (saved.q_idx || 0) : 0;
+    if (has && saved.phase === "fb") idx += 1;   // 反馈页退出 → 从下一题继续
+    if (phase === "q" && idx >= d.questions.length) {
+      // 练习已答完但没点通关就退了：直接进完成页，不重复领 XP
+      lesson = { kp_id: d.kp_id, name: d.name, subject: d.subject, points: d.points,
+                 questions: d.questions, idx: 0, phase: "done", results: saved.results || [],
+                 rewarded: true, reward: null };
+      clearProgress();
+      renderLesson();
+      return;
+    }
     lesson = { kp_id: d.kp_id, name: d.name, subject: d.subject, points: d.points,
-               questions: d.questions, idx: 0, phase: "learn", results: [], rewarded: false };
+               questions: d.questions, idx: idx, phase: phase,
+               results: has ? (saved.results || []) : [], rewarded: false };
+    deck.idx = has ? (saved.card_idx || 0) : 0;
     renderLesson();
   } catch (e) { toast(e.message); }
 }
 
+const PROG_KEY = "lesson_progress";
+function saveProgress() {
+  if (!lesson || lesson.phase === "done") { clearProgress(); return; }
+  try {
+    localStorage.setItem(PROG_KEY, JSON.stringify({
+      kp_id: lesson.kp_id, phase: lesson.phase,
+      card_idx: deck.idx, q_idx: lesson.idx,
+      results: lesson.results || [], ts: Date.now(),
+    }));
+  } catch (e) {}
+}
+function loadProgress() {
+  try { return JSON.parse(localStorage.getItem(PROG_KEY) || "null"); } catch (e) { return null; }
+}
+function clearProgress() { try { localStorage.removeItem(PROG_KEY); } catch (e) {} }
+
 function exitToLearn() {
+  saveProgress();
   lesson = null; aiQuiz = null; deck.idx = 0;
   ttsStop();
   renderLearn();
@@ -342,15 +377,16 @@ async function finishLesson(L) {
   const allOk = L.results.length > 0 && L.results.every(Boolean);
   const d = await post("/api/lesson/finish", { kp_id: L.kp_id, all_correct: allOk });
   L.rewarded = true; L.reward = d;
+  clearProgress();
   await refreshHeader();
   renderLesson();
 }
 function renderLessonDone(L) {
   const el = $("#tabLearn");
-  const r = L.reward || { bonus: 20, newly_unlocked: 0, mastery: 0, status: "" };
+  const r = L.reward || { bonus: 0, newly_unlocked: 0, mastery: 0, status: "学习中" };
   el.innerHTML = `<div style="text-align:center;padding:20px 0 8px;">🎉</div>
     <h3 style="text-align:center;">通关：${esc(L.name)}</h3>
-    <div class="chart-card mt12">+${r.bonus} XP（全对奖励 ${L.results.length > 0 && L.results.every(Boolean) ? "已含" : "未含"}）
+    <div class="chart-card mt12">${r.bonus ? "+" + r.bonus + " XP（全对奖励 " + (L.results.length > 0 && L.results.every(Boolean) ? "已含" : "未含") + "）" : "本课已学完 🎉"}
       <div class="cap mt8">掌握度 ${r.mastery}%（${esc(r.status)}）${r.newly_unlocked ? "｜🔓 解锁了 " + r.newly_unlocked + " 节新课" : ""}</div>
     </div>
     <div class="btn-row">
