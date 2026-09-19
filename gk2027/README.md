@@ -6,12 +6,15 @@
 
 | 部署点 | 访问地址 | 方式 | 状态 |
 |--------|----------|------|------|
-| 爱快软路由（主用） | `http://p.mhtc.top:8577` / `http://192.168.100.1:8577` | Docker Compose（Web 编排） | 运行中 |
-| 软路由 iStoreOS（备用） | `http://192.168.100.88:8577` | Docker 容器 `gk2027-mobile`（`--restart always`） | 运行中 |
-| 本地 Windows | — | 已停用，不再开机自启 | 停用 |
+| 外网（主用） | **`https://p.mhtc.top:8443`**（正式证书，防锁屏） | 88 软路由 Docker 容器 `gk2027-mobile` | 运行中 |
+| 旧入口（兼容） | `http://p.mhtc.top:8577` | 同容器 8577 端口 | 运行中 |
+| 软路由 iStoreOS（88） | `http://192.168.100.88:8577` / `https://192.168.100.88:8443`（自签备用） | Docker 容器 `gk2027-mobile`（`--restart always`） | 运行中 |
+| 本地 Windows | `http://192.168.100.200:8577` / `https://192.168.100.200:8443` | `python svc.py restart`（开发用） | 运行中 |
 
 代码仓库：`https://github.com/sunwan523/gk2027`（main 分支）
 镜像：`ghcr.io/sunwan523/gk2027-mobile:latest`（amd64 + arm64 多架构）
+
+> 📖 **HTTPS 部署、正式证书（Let's Encrypt + Cloudflare DNS-01）、密钥管理、防锁屏朗读、容器运维**详见 [docs/DEPLOY.md](docs/DEPLOY.md)。
 
 ## 自动部署（git commit 即部署）
 
