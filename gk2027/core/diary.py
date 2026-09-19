@@ -424,17 +424,22 @@ def delete_weight(conn, uid: str, date: str):
 # AI 整理（分类 + 摘要 + 建议）；隐秘内容禁止调用
 # ----------------------------------------------------------------------
 def organize(text: str) -> dict:
-    sys = ("你是高考复习成长空间的整理助手。用户随手写了段话（可能是学习总结、心情、想法、反思）。"
-           "请：1)分类，只能从【学习总结、心情、想法、反思、灵感】中选一个最贴切的；"
-           "2)一句话摘要，不超过30字；3)若对复习有帮助给一句简短建议，否则空字符串。"
-           "只输出JSON：{\"category\":\"\",\"summary\":\"\",\"advice\":\"\"}")
+    sys = ("你是文字规范化助手。用户输入一段口语化的文字（可能来自语音输入，可能已有轻微整理）。\n"
+           "你的核心任务是把这段文字改写成规范的书面语，硬性要求：\n"
+           "1. 保留全部内容和信息，不改变原意，不删减、不添加任何实质内容；\n"
+           "2. 只做语言规范化：修正口语词、语病、重复啰嗦、错别字、标点，理顺句式，适当分段；\n"
+           "3. 不追求华丽文风，保持朴素、准确、通顺，贴近原文的语气但更书面；\n"
+           "4. 绝对不能缩写、总结成短句或丢失任何细节。\n"
+           "随后附加：category 只能从【学习总结、心情、想法、反思、灵感】中选一个最贴切的；"
+           "summary 给一句话摘要（不超过30字）；若对复习有帮助给一句简短建议 advice，否则空字符串。\n"
+           "只输出JSON：{\"category\":\"\",\"summary\":\"\",\"advice\":\"\",\"text\":\"规范化后的完整正文\"}")
     payload = {
         "model": MODEL,
         "messages": [
             {"role": "system", "content": sys},
-            {"role": "user", "content": (text or "")[:1500]},
+            {"role": "user", "content": (text or "")[:2000]},
         ],
-        "temperature": 0.4, "max_tokens": 300,
+        "temperature": 0.3, "max_tokens": 900,
     }
     body = _chat(payload)
     content = (body["choices"][0]["message"]["content"] or "").strip()
@@ -445,8 +450,11 @@ def organize(text: str) -> dict:
             c = j.get("category", "")
             if c not in CATEGORIES:
                 c = "想法"
+            ntext = (j.get("text") or "").strip()
             return {"category": c, "summary": (j.get("summary") or "")[:200],
-                    "advice": (j.get("advice") or "")[:200]}
+                    "advice": (j.get("advice") or "")[:200],
+                    "text": ntext if ntext else (text or "").strip()}
         except Exception:
             pass
-    return {"category": "想法", "summary": (text or "").strip()[:60], "advice": ""}
+    return {"category": "想法", "summary": (text or "").strip()[:60], "advice": "",
+            "text": (text or "").strip()}

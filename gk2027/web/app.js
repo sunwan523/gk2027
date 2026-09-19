@@ -1175,9 +1175,21 @@ async function aiOrganize() {
   $("#noteAiOut").innerHTML = `<div class="spinner">✨ AI 整理中…</div>`;
   try {
     const r = await post("/api/diary/ai_organize", { text: t });
-    $("#noteAiOut").innerHTML =
-      `<div class="ai-result"><span class="ai-cat">${esc(r.category)}</span>${esc(r.summary)}` +
-      (r.advice ? `<br><span style="color:#888">💡 ${esc(r.advice)}</span>` : "") + `</div>`;
+    const nt = r.text || t;
+    $("#noteAiOut").innerHTML = `
+      <div class="ai-result">
+        <div class="ai-head"><span class="ai-cat">${esc(r.category)}</span>
+          <button class="ai-use" id="aiUseTxt">✅ 使用整理结果</button></div>
+        <div class="ai-text">${esc(nt)}</div>
+        <div class="ai-sub">📌 ${esc(r.summary || "—")}</div>
+        ${r.advice ? `<div class="ai-sub" style="color:#888">💡 ${esc(r.advice)}</div>` : ""}
+      </div>`;
+    const useBtn = $("#aiUseTxt");
+    if (useBtn) useBtn.onclick = () => {
+      const box = $("#noteText");
+      if (box) { box.value = nt; box.focus(); }
+      toast("已填入，可再修改后保存");
+    };
   } catch (e) {
     $("#noteAiOut").innerHTML = `<div class="ai-result" style="color:#d9534f">${esc(e.message)}</div>`;
   }
