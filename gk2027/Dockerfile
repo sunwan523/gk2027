@@ -15,11 +15,17 @@ ENV GK_FONT_DIR=/app/fonts
 # 依赖（国内网络用清华镜像源；构建成功后部署端只拉取成品镜像，无需 pip）
 RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple -r requirements.txt
 
+# 自签证书生成依赖 openssl
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
+
 # 运行态目录（容器内 data/output/logs 挂载或新建）
 RUN mkdir -p /app/data /app/output /app/logs
 
-EXPOSE 8577
+EXPOSE 8577 8443
 
-# FastAPI 入口（svc.py 是 Windows 服务管理，容器内直接用 uvicorn）
-CMD ["python", "-m", "uvicorn", "server:app", \
-     "--host", "0.0.0.0", "--port", "8577"]
+# 入口脚本：先确保自签证书，再起 8443(HTTPS 防锁屏) + 8577(HTTP 兼容旧入口)
+COPY entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+
+CMD ["/app/entrypoint.sh"]
