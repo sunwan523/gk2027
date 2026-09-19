@@ -335,6 +335,7 @@ function exitToLearn() {
   saveProgress();
   lesson = null; aiQuiz = null; deck.idx = 0;
   ttsStop();
+  const hb = $("#headerBar"); if (hb) hb.style.display = "";
   renderLearn();
 }
 
@@ -345,18 +346,44 @@ function renderLesson() {
   if (L.phase === "done") { renderLessonDone(L); return; }
   if (L.phase === "learn") {
     reportAct("学习", L.subject, L.kp_id);
-    el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitLearn">← 返回</button></div>
-      <h3>📖 ${esc(L.name)}</h3>
-      <div class="cap">${L.points.length} 张知识点卡片 · 朗读可自动翻页</div>
+    const hb = $("#headerBar"); if (hb) hb.style.display = "none";   // 学习页顶部全留给内容
+    el.innerHTML = `
+      <div class="learn-top">
+        <button class="back-btn" id="exitLearn" title="返回列表">←</button>
+        <h3 class="learn-title">📖 ${esc(L.name)}</h3>
+        <span class="deck-pos" id="deckPos"></span>
+        <button class="ai-avatar" id="helpAi" title="这句没懂？让 AI 讲懂"><span class="ai-cap">🎓</span><span>AI</span></button>
+      </div>
       <div id="deckWrap"></div>
+      <div id="aiExplainBox"></div>
       <div class="btn-row">
-        <button class="btn primary" id="toQuiz">我学完了，开始练习 ✏️</button>
+        <button class="btn primary" id="toQuiz">开始练习 ✏️</button>
         <button class="btn ghost" id="skipQuiz">跳过</button>
       </div>`;
     renderDeck(L.points);
     $("#exitLearn").onclick = exitToLearn;
     $("#toQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
     $("#skipQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
+    $("#helpAi").onclick = async () => {
+      const box = $("#aiExplainBox");
+      box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
+      try {
+        const d = await post("/api/ai_explain", { kp_id: L.kp_id, text: (L.points[deck.idx] || "") });
+        const plain = (d.explain || "").trim();
+        box.innerHTML = `<div class="ai-explain">
+          <div class="ae-head">🤖 AI 讲懂 · ${esc(L.name)}
+            <button class="ae-speak" id="aeSpeak">🔊 朗读讲解</button>
+            <button class="ae-close" id="aeClose">✕</button></div>
+          <div class="ae-body">${markdownish(plain)}</div></div>`;
+        $("#aeClose").onclick = () => { box.innerHTML = ""; ttsStop(); };
+        $("#aeSpeak").onclick = () => {
+          const paras = plain.split(/\n+/).map(x => x.replace(/^[-*•#\s]+/, "").trim()).filter(Boolean);
+          if (paras.length) ttsSpeak(paras);
+        };
+      } catch (e) {
+        box.innerHTML = `<div class="fb-wrong">${esc(e.message)}</div>`;
+      }
+    };
     return;
   }
   // 练习 / 反馈
@@ -484,18 +511,14 @@ function renderDeck(points) {
   const wrap = $("#deckWrap");
   if (!wrap) return;
   const i = deck.idx;
+  const pos = $("#deckPos");
+  if (pos) pos.textContent = `${i + 1}/${points.length}`;
   wrap.innerHTML = `
-    <div class="deck-progress">
-      <div class="bar"><div style="width:${Math.round((i + 1) / points.length * 100)}%"></div></div>
-      <span>${i + 1}/${points.length}</span>
-      <button class="ai-avatar" id="helpAi" title="这句没懂？让 AI 讲懂"><span class="ai-cap">🎓</span><span>AI</span></button>
-    </div>
     <div class="deck-body" id="deckBody">
       ${esc(points[i])}
       <div class="deck-tap left" id="deckTapL" title="上一张"></div>
       <div class="deck-tap right" id="deckTapR" title="下一张"></div>
     </div>
-    <div id="aiExplainBox"></div>
     <div class="tts-bar">
       <div class="tts-row">
         <button class="tts-mini" id="deckPrev" title="上一条">⏮</button>
@@ -522,9 +545,13 @@ function bindDeck(points) {
   };
   $("#ttsPlay").onclick = () => {
     if (tts.playing || window.speechSynthesis.paused) { ttsToggle(); return; }
-    ttsSpeak(points.slice(deck.idx), () => {
-      if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); }
-    });
+    const readFrom = (i) => {
+      if (i < 0 || i >= points.length) return;
+      ttsSpeak([points[i]], () => {
+        if (deck.auto && deck.idx < points.length - 1) { deck.idx += 1; renderDeck(points); readFrom(deck.idx); }
+      });
+    };
+    readFrom(deck.idx);
   };
   // 左右边缘点击翻页
   const tl = $("#deckTapL"), tr = $("#deckTapR");
@@ -547,28 +574,6 @@ function bindDeck(points) {
     }, { passive: true });
     body.addEventListener("pointercancel", () => { tracking = false; });
   }
-  // 遇到不懂的：AI 讲懂
-  const curText = () => points[deck.idx] || "";
-  $("#helpAi").onclick = async () => {
-    const box = $("#aiExplainBox");
-    box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
-    try {
-      const d = await post("/api/ai_explain", { kp_id: lesson ? lesson.kp_id : "", text: curText() });
-      const plain = (d.explain || "").trim();
-      box.innerHTML = `<div class="ai-explain">
-        <div class="ae-head">🤖 AI 讲懂 · ${esc(lesson ? lesson.name : "")}
-          <button class="ae-speak" id="aeSpeak">🔊 朗读讲解</button>
-          <button class="ae-close" id="aeClose">✕</button></div>
-        <div class="ae-body">${markdownish(plain)}</div></div>`;
-      $("#aeClose").onclick = () => { box.innerHTML = ""; ttsStop(); };
-      $("#aeSpeak").onclick = () => {
-        const paras = plain.split(/\n+/).map(x => x.replace(/^[-*•#\s]+/, "").trim()).filter(Boolean);
-        if (paras.length) ttsSpeak(paras);
-      };
-    } catch (e) {
-      box.innerHTML = `<div class="fb-wrong">${esc(e.message)}</div>`;
-    }
-  };
 }
 // ---------- AI 出题 ----------
 async function renderAiQuiz() {

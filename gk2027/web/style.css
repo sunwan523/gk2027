@@ -24,6 +24,11 @@
 .lc-actions { display:flex; gap:6px; flex-shrink:0; }
 .lc-restart { padding:8px 12px; font-size:13px; border:1px solid #ddd; border-radius:8px; background:#fff; color:#888; cursor:pointer; }
 .page-top { display:flex; margin-bottom:6px; }
+.learn-top { display:flex; align-items:center; gap:6px; padding:6px 0 4px; min-height:32px; }
+.learn-top .back-btn { background:none; border:none; padding:2px 4px; font-size:17px; color:#4a90d9; cursor:pointer; flex-shrink:0; }
+.learn-top .back-btn:active { opacity:.6; }
+.learn-title { flex:1; font-size:15px; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.deck-pos { font-size:11px; color:#888; white-space:nowrap; flex-shrink:0; }
 .back-btn { background:#fff; border:1px solid #ddd; border-radius:8px; padding:4px 12px; font-size:13px; color:#555; cursor:pointer; }
 * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
 html, body { height:100%; }
@@ -70,8 +75,8 @@ button { font-family:inherit; }
 .btn.danger { background:#fff; color:#d9534f; border:1px solid #f0c2c0; }
 .btn.ghost { background:#f2f3f7; color:#444; border:1px solid #e3e4ea; }
 .btn:disabled { opacity:.5; }
-.btn-row { display:flex; gap:8px; margin-top:10px; }
-.btn-row .btn { flex:1; }
+.btn-row { display:flex; gap:8px; margin-top:8px; }
+.btn-row .btn { flex:1; padding:7px 0; font-size:14px; }
 .mt8 { margin-top:8px; } .mt12 { margin-top:12px; } .mt16 { margin-top:16px; }
 
 /* ---------- 课程列表 ---------- */
@@ -94,14 +99,14 @@ button { font-family:inherit; }
   background:linear-gradient(135deg,#f8f9ff,#eef2ff); border:1px solid #dce4ff; border-radius:12px;
   margin-bottom:8px; font-size:15px; line-height:1.8; color:#1a1b1c; text-align:left;
 }
-.tts-bar { background:transparent; border:none; border-radius:10px; padding:4px 2px; margin-bottom:6px; }
-.tts-row { display:flex; align-items:center; gap:5px; flex-wrap:nowrap; }
+.tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
+.tts-row { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:nowrap; }
 .tts-btn { border:1px solid #cfe2ff; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
-.tts-play { border:none; background:transparent; color:#5b7cfa; width:36px; height:36px; cursor:pointer; font-size:20px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
+.tts-play { border:none; background:transparent; color:#5b7cfa; width:44px; height:44px; cursor:pointer; font-size:24px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .tts-play:active { background:#eef1f8; }
-.tts-mini { border:none; background:#eef1f8; border-radius:50%; width:30px; height:30px; cursor:pointer; font-size:13px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
-.tts-spd { font-size:10px; color:#666; flex-shrink:0; white-space:nowrap; }
-.tts-row input[type=range] { width:46px; flex-shrink:1; min-width:30px; }
+.tts-mini { border:none; background:#eef1f8; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
+.tts-spd { font-size:11px; color:#666; flex-shrink:0; white-space:nowrap; }
+.tts-row input[type=range] { width:60px; flex-shrink:1; min-width:36px; }
 .tts-row select { font-size:10px; padding:1px; border:1px solid #cfe2ff; border-radius:4px; flex:1; min-width:56px; max-width:110px; }
 .tts-auto { font-size:10px; color:#666; display:flex; align-items:center; gap:2px; white-space:nowrap; }
 
