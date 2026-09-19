@@ -100,14 +100,20 @@ button { font-family:inherit; }
   margin-bottom:8px; font-size:18px; line-height:1.9; color:#1a1b1c; text-align:left;
 }
 .tts-bar { background:transparent; border:none; border-radius:10px; padding:6px 2px; margin:4px 0 8px; }
-.tts-row { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:nowrap; }
+.tts-row { display:flex; align-items:center; justify-content:center; gap:12px; flex-wrap:nowrap; position:relative; }
+.tts-right { display:flex; gap:8px; margin-left:auto; }
+.tts-bar { position:relative; }
+.tts-pop { position:absolute; bottom:calc(100% + 8px); left:50%; transform:translateX(-50%); background:#fff; border:1px solid #dce4ff; border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,.14); display:flex; gap:4px; padding:5px; z-index:60; }
+.tts-pop[hidden] { display:none; }
+.tts-pop button { border:none; background:#f0f4ff; border-radius:9px; padding:8px 16px; font-size:14px; font-weight:600; color:#333; cursor:pointer; }
+.tts-pop button:active { background:#dce8ff; }
 .tts-btn { border:1px solid #cfe2ff; background:#fff; border-radius:6px; padding:4px 10px; cursor:pointer; font-size:13px; }
 .tts-play { border:none; background:transparent; color:#5b7cfa; width:44px; height:44px; cursor:pointer; font-size:24px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; border-radius:50%; }
 .tts-play:active { background:#eef1f8; }
 .tts-mini { border:none; background:#eef1f8; border-radius:50%; width:36px; height:36px; cursor:pointer; font-size:15px; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .tts-turn { border:none; background:#eef1f8; color:#4a6bb3; border-radius:14px; padding:0 12px; height:34px; cursor:pointer; font-size:13px; font-weight:600; line-height:1; flex-shrink:0; display:flex; align-items:center; justify-content:center; }
 .tts-turn:active { opacity:.7; }
-.tts-spd { font-size:11px; color:#666; flex-shrink:0; white-space:nowrap; }
+.tts-spd { font-size:12px; color:#666; flex-shrink:0; white-space:nowrap; border:none; background:none; padding:6px 4px; cursor:pointer; }
 .tts-row input[type=range] { width:60px; flex-shrink:1; min-width:36px; }
 .tts-rate { font-size:13px; padding:4px 8px; border:1px solid #cfe2ff; border-radius:8px; background:#fff; color:#333; flex-shrink:0; cursor:pointer; }
 .tts-row select { font-size:10px; padding:1px; border:1px solid #cfe2ff; border-radius:4px; flex:1; min-width:56px; max-width:110px; }

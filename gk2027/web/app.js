@@ -524,14 +524,18 @@ function renderDeck(points) {
     </div>
     <div class="tts-bar">
       <div class="tts-row">
-        <button class="tts-turn" id="deckPrev" title="上一张">上一面</button>
         <button class="tts-play" id="ttsPlay" title="朗读/暂停">▶️</button>
-        <button class="tts-turn" id="deckNext" title="下一张">下一面</button>
         <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
-        <span class="tts-spd" title="语速">语速</span>
-        <select id="ttsRate" class="tts-rate" title="语速">
-          ${[1, 1.5, 2].map(r => `<option value="${r}" ${Math.abs(tts.rate - r) < 0.01 ? "selected" : ""}>${r}x</option>`).join("")}
-        </select>
+        <button class="tts-spd" id="ttsRateBtn" title="语速">语速 ▾</button>
+        <span class="tts-right">
+          <button class="tts-turn" id="deckPrev" title="上一张">上一页</button>
+          <button class="tts-turn" id="deckNext" title="下一张">下一页</button>
+        </span>
+      </div>
+      <div class="tts-pop" id="ttsRatePop" hidden>
+        <button data-r="1">1x</button>
+        <button data-r="1.5">1.5x</button>
+        <button data-r="2">2x</button>
       </div>
     </div>`;
   ttsLoadVoices();
@@ -554,7 +558,17 @@ function bindDeck(points) {
   $("#deckPrev").onclick = () => deckTurnTo(deck.idx - 1, points);
   $("#deckNext").onclick = () => deckTurnTo(deck.idx + 1, points);
   $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
-  $("#ttsRate").onchange = (e) => { tts.rate = parseFloat(e.target.value); localStorage.setItem("tts_rate", String(tts.rate)); };
+  const rbtn = $("#ttsRateBtn"), rpop = $("#ttsRatePop");
+  if (rbtn && rpop) {
+    rbtn.onclick = (e) => { e.stopPropagation(); rpop.hidden = !rpop.hidden; };
+    rpop.querySelectorAll("button").forEach(b => {
+      b.onclick = () => {
+        tts.rate = parseFloat(b.dataset.r);
+        localStorage.setItem("tts_rate", String(tts.rate));
+        rpop.hidden = true;
+      };
+    });
+  }
   const tv = $("#ttsVoice");
   if (tv) tv.onchange = (e) => {
     const v = tts.voices[parseInt(e.target.value)];
