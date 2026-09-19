@@ -37,8 +37,8 @@ from reportlab.platypus import (BaseDocTemplate, Frame, HRFlowable, Image,
                                KeepTogether, PageBreak, PageTemplate,
                                Paragraph, Spacer, Table, TableStyle)
 
-from config import (EXAM_DURATION, EXAM_FULL_MARK, FONT_BOLD, FONT_REGULAR,
-                    IMAGE_DIR, OUTPUT_DIR, SUBJECTS)
+from config import (EXAM_DURATION, EXAM_FULL_MARK, FONT_BOLD, FONT_DIR,
+                    FONT_REGULAR, IMAGE_DIR, OUTPUT_DIR, SUBJECTS)
 from core import db, srs
 
 _FONTS_READY = False
@@ -67,7 +67,7 @@ def ensure_fonts() -> tuple[str, str]:
         except Exception:
             pdfmetrics.registerFont(TTFont(name, path))
     # 符号回退字体：Segoe UI Symbol 覆盖雅黑缺失的 ⇌ ₂ ₃ ⁻ ⊗ 等。
-    fallback_path = r"C:\Windows\Fonts\seguisym.ttf"
+    fallback_path = os.path.join(FONT_DIR, "seguisym.ttf")
     if os.path.exists(fallback_path):
         pdfmetrics.registerFont(TTFont("seguisym", fallback_path))
         sym = TTFont("seguisym_probe", fallback_path).face.charToGlyph

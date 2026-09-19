@@ -108,9 +108,11 @@ ADMIN_DEADLINES = [
 
 # --------------------------------------------------------------------------
 # PDF 字体（勿改为宋体，理由见文件头）
+# 容器/服务器部署时用环境变量 GK_FONT_DIR 指向字体目录；本机默认 Windows 字体目录
 # --------------------------------------------------------------------------
-FONT_REGULAR = ("msyh", r"C:\Windows\Fonts\msyh.ttc", 0)
-FONT_BOLD = ("msyhbd", r"C:\Windows\Fonts\msyhbd.ttc", 0)
+FONT_DIR = os.environ.get("GK_FONT_DIR", r"C:\Windows\Fonts")
+FONT_REGULAR = ("msyh", os.path.join(FONT_DIR, "msyh.ttc"), 0)
+FONT_BOLD = ("msyhbd", os.path.join(FONT_DIR, "msyhbd.ttc"), 0)
 
 # --------------------------------------------------------------------------
 # 来源类型（方案 5.3：AI 生成题永不带年份卷别）

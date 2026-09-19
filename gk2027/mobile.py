@@ -132,20 +132,22 @@ def _render_tts_controls(pts: list[str]):
     import json
     js_pts = json.dumps(pts, ensure_ascii=False)
     html = """
-<div style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:10px;padding:8px 12px;margin-bottom:8px;">
-  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-    <button onclick="prevPt()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">⏮</button>
-    <button onclick="togglePlay()" id="ttsPlay" style="border:1px solid #4a90d9;background:#4a90d9;color:#fff;border-radius:6px;padding:4px 12px;cursor:pointer;font-size:13px;font-weight:600;">▶️ 朗读</button>
-    <button onclick="nextPt()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">⏭</button>
-    <button onclick="stopTts()" style="border:1px solid #f5c2c7;background:#fff;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:14px;">⏹</button>
-    <span style="font-size:11px;color:#666;">语速</span>
-    <input type="range" id="ttsRate" min="0.5" max="1.8" step="0.1" value="1" oninput="setRate(this.value)" style="width:60px;vertical-align:middle;">
-    <span style="font-size:11px;color:#666;">音调</span>
-    <input type="range" id="ttsPitch" min="0.5" max="1.5" step="0.1" value="1" oninput="setPitch(this.value)" style="width:50px;vertical-align:middle;">
-    <select id="ttsVoice" onchange="setVoice(this.value)" style="font-size:11px;padding:2px;border:1px solid #cfe2ff;border-radius:4px;max-width:140px;">
+<div style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:10px;padding:6px 8px;margin-bottom:8px;">
+  <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+    <button onclick="prevPt()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;">⏮</button>
+    <button onclick="togglePlay()" id="ttsPlay" style="border:1px solid #4a90d9;background:#4a90d9;color:#fff;border-radius:6px;padding:3px 10px;cursor:pointer;font-size:12px;font-weight:600;">▶️ 朗读</button>
+    <button onclick="nextPt()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;">⏭</button>
+    <button onclick="stopTts()" style="border:1px solid #f5c2c7;background:#fff;border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;">⏹</button>
+    <span id="ttsStat" style="font-size:10px;color:#888;margin-left:auto;white-space:nowrap;">共 %d 条</span>
+  </div>
+  <div style="display:flex;align-items:center;gap:4px;margin-top:4px;flex-wrap:wrap;">
+    <span style="font-size:10px;color:#666;white-space:nowrap;">语速</span>
+    <input type="range" id="ttsRate" min="0.5" max="1.8" step="0.1" value="1" oninput="setRate(this.value)" style="width:50px;vertical-align:middle;flex-shrink:1;">
+    <span style="font-size:10px;color:#666;white-space:nowrap;">音调</span>
+    <input type="range" id="ttsPitch" min="0.5" max="1.5" step="0.1" value="1" oninput="setPitch(this.value)" style="width:40px;vertical-align:middle;flex-shrink:1;">
+    <select id="ttsVoice" onchange="setVoice(this.value)" style="font-size:10px;padding:1px;border:1px solid #cfe2ff;border-radius:4px;flex:1;min-width:80px;max-width:120px;">
       <option value="">加载语音…</option>
     </select>
-    <span id="ttsStat" style="font-size:11px;color:#888;margin-left:auto;">共 %d 条</span>
   </div>
 </div>
 <script>
@@ -179,7 +181,133 @@ function prevPt(){if(idx>0)speak(idx-1)}
 function nextPt(){if(idx<pts.length-1)speak(idx+1)}
 </script>
 """ % (len(pts), js_pts)
-    components.html(html, height=56, scrolling=False)
+    components.html(html, height=72, scrolling=False)
+
+
+def _render_card_deck(pts: list[str]):
+    """卡片式学习组件：卡片翻页 + 朗读联动，读完自动翻下一张。"""
+    import json
+    js_pts = json.dumps(pts, ensure_ascii=False)
+    html = """
+<div id="cardDeck" style="margin-bottom:10px;">
+  <!-- 进度 -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+    <div style="flex:1;background:#eee;border-radius:6px;height:8px;overflow:hidden;">
+      <div id="cardProgress" style="background:#4a90d9;height:8px;border-radius:6px;width:0%;transition:width .3s;"></div>
+    </div>
+    <span id="cardCount" style="font-size:11px;color:#888;white-space:nowrap;">1/""" + str(len(pts)) + """</span>
+  </div>
+
+  <!-- 卡片内容 -->
+  <div id="cardBody" style="padding:18px 14px;min-height:200px;
+       display:flex;align-items:center;justify-content:center;
+       background:linear-gradient(135deg,#f8f9ff,#eef2ff);
+       border:1px solid #dce4ff;border-radius:12px;margin-bottom:8px;
+       font-size:15px;line-height:1.8;color:#1a1b1c;text-align:left;">
+  </div>
+
+  <!-- 朗读控制行 -->
+  <div style="background:#f0f7ff;border:1px solid #cfe2ff;border-radius:10px;padding:6px 8px;margin-bottom:6px;">
+    <div style="display:flex;align-items:center;gap:4px;justify-content:center;">
+      <button onclick="cardPrev()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">⏮</button>
+      <button onclick="cardTogglePlay()" id="cardPlay" style="border:1px solid #4a90d9;background:#4a90d9;color:#fff;border-radius:6px;padding:4px 14px;cursor:pointer;font-size:12px;font-weight:600;">▶️ 朗读</button>
+      <button onclick="cardNext()" style="border:1px solid #cfe2ff;background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">⏭</button>
+      <button onclick="cardStop()" style="border:1px solid #f5c2c7;background:#fff;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:13px;">⏹</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:4px;margin-top:5px;flex-wrap:wrap;">
+      <span style="font-size:10px;color:#666;white-space:nowrap;">语速</span>
+      <input type="range" id="cardRate" min="0.5" max="1.8" step="0.1" value="1" oninput="cardSetRate(this.value)" style="width:50px;flex-shrink:1;">
+      <span style="font-size:10px;color:#666;white-space:nowrap;">音调</span>
+      <input type="range" id="cardPitch" min="0.5" max="1.5" step="0.1" value="1" oninput="cardSetPitch(this.value)" style="width:40px;flex-shrink:1;">
+      <select id="cardVoice" onchange="cardSetVoice(this.value)" style="font-size:10px;padding:1px;border:1px solid #cfe2ff;border-radius:4px;flex:1;min-width:80px;max-width:130px;">
+        <option value="">加载语音…</option>
+      </select>
+      <label style="font-size:10px;color:#666;white-space:nowrap;display:flex;align-items:center;gap:2px;">
+        <input type="checkbox" id="cardAuto" checked style="margin:0;">自动翻页
+      </label>
+    </div>
+  </div>
+
+  <!-- 翻页按钮 -->
+  <div style="display:flex;gap:6px;">
+    <button onclick="cardPrev()" id="cardPrevBtn" style="flex:1;border:1px solid #ddd;background:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:13px;">⬅️ 上一张</button>
+    <button onclick="cardNext()" id="cardNextBtn" style="flex:1;border:1px solid #4a90d9;background:#4a90d9;color:#fff;border-radius:8px;padding:8px;cursor:pointer;font-size:13px;font-weight:600;">下一张 ➡️</button>
+  </div>
+</div>
+
+<script>
+var cPts=""" + js_pts + """,cIdx=0,cPlaying=false,cRate=1.0,cPitch=1.0,cUtter=null,cVoices=[],cVoice=null,cAuto=true;
+
+function cLoadVoices(){
+  cVoices=window.speechSynthesis.getVoices().filter(function(v){return v.lang&&v.lang.toLowerCase().indexOf('zh')>=0});
+  var sel=document.getElementById('cardVoice');if(!sel)return;
+  sel.innerHTML='';var saved=localStorage.getItem('tts_voice');var found=false;
+  if(cVoices.length===0){sel.innerHTML='<option value="">无中文语音</option>';return}
+  cVoices.forEach(function(v,i){var o=document.createElement('option');o.value=i;o.text=v.name+(v.default?' (默认)':'');sel.appendChild(o);if(saved&&v.name===saved){sel.value=i;found=true;cVoice=v}});
+  if(!found){cVoice=cVoices[0];sel.value=0}
+}
+if(window.speechSynthesis.onvoiceschanged!==undefined){window.speechSynthesis.onvoiceschanged=cLoadVoices}
+cLoadVoices();
+try{var sr=localStorage.getItem('tts_rate');if(sr){cRate=parseFloat(sr);document.getElementById('cardRate').value=sr}
+var sp=localStorage.getItem('tts_pitch');if(sp){cPitch=parseFloat(sp);document.getElementById('cardPitch').value=sp}}catch(e){}
+
+function cRender(){
+  var body=document.getElementById('cardBody');
+  body.innerHTML=cPts[cIdx];
+  var pct=cPts.length>1?(cIdx/(cPts.length-1)*100):100;
+  document.getElementById('cardProgress').style.width=pct+'%';
+  document.getElementById('cardCount').textContent=(cIdx+1)+'/'+cPts.length;
+  document.getElementById('cardPrevBtn').disabled=(cIdx===0);
+  document.getElementById('cardPrevBtn').style.opacity=(cIdx===0)?0.4:1;
+  document.getElementById('cardNextBtn').disabled=(cIdx>=cPts.length-1);
+  document.getElementById('cardNextBtn').style.opacity=(cIdx>=cPts.length-1)?0.4:1;
+}
+
+function cSpeak(i){
+  if(i<0||i>=cPts.length)return;
+  cIdx=i;cRender();
+  window.speechSynthesis.cancel();
+  cUtter=new SpeechSynthesisUtterance(cPts[i]);
+  cUtter.lang='zh-CN';cUtter.rate=cRate;cUtter.pitch=cPitch;
+  if(cVoice)cUtter.voice=cVoice;
+  cUtter.onend=function(){
+    if(cIdx<cPts.length-1){
+      cAuto=document.getElementById('cardAuto').checked;
+      if(cAuto){cSpeak(cIdx+1)}
+      else{cPlaying=false;document.getElementById('cardPlay').textContent='▶️ 朗读'}
+    }else{
+      cPlaying=false;document.getElementById('cardPlay').textContent='▶️ 朗读';
+    }
+  };
+  cUtter.onerror=function(){cPlaying=false;document.getElementById('cardPlay').textContent='▶️ 朗读'};
+  window.speechSynthesis.speak(cUtter);
+  cPlaying=true;
+  document.getElementById('cardPlay').textContent='⏸ 暂停';
+}
+
+function cardTogglePlay(){
+  if(cPlaying){
+    window.speechSynthesis.pause();cPlaying=false;
+    document.getElementById('cardPlay').textContent='▶️ 继续';
+  }else if(window.speechSynthesis.paused){
+    window.speechSynthesis.resume();cPlaying=true;
+    document.getElementById('cardPlay').textContent='⏸ 暂停';
+  }else{cSpeak(cIdx)}
+}
+function cardStop(){
+  window.speechSynthesis.cancel();cPlaying=false;
+  document.getElementById('cardPlay').textContent='▶️ 朗读';
+}
+function cardPrev(){if(cIdx>0){cAuto=document.getElementById('cardAuto').checked;if(cPlaying)cSpeak(cIdx-1);else{cIdx--;cRender()}}}
+function cardNext(){if(cIdx<cPts.length-1){cAuto=document.getElementById('cardAuto').checked;if(cPlaying)cSpeak(cIdx+1);else{cIdx++;cRender()}}}
+function cardSetRate(r){cRate=parseFloat(r);localStorage.setItem('tts_rate',r);if(cPlaying)cSpeak(cIdx)}
+function cardSetPitch(p){cPitch=parseFloat(p);localStorage.setItem('tts_pitch',p);if(cPlaying)cSpeak(cIdx)}
+function cardSetVoice(i){cVoice=cVoices[parseInt(i)];localStorage.setItem('tts_voice',cVoice?cVoice.name:'');if(cPlaying)cSpeak(cIdx)}
+
+cRender();
+</script>
+"""
+    components.html(html, height=380, scrolling=False)
 
 
 # ----------------------------------------------------------------------
@@ -309,50 +437,8 @@ def render_lesson():
         if not pts:
             st.info("该知识点暂无详细讲解，可直接进入练习。")
         else:
-            # 卡片式翻页学习
-            card_idx = L.get("card_idx", 0)
-            total = len(pts)
-
-            # 朗读控制条
-            _render_tts_controls(pts)
-
-            # 卡片进度
-            st.progress(card_idx / max(1, total - 1))
-            st.caption("卡片 %d / %d" % (card_idx + 1, total))
-
-            # 当前卡片
-            with st.container(border=True):
-                st.markdown(
-                    """
-                    <div style="padding:20px 16px;min-height:180px;
-                                display:flex;align-items:center;justify-content:center;
-                                background:linear-gradient(135deg,#f8f9ff,#eef2ff);
-                                border-radius:12px;margin:8px 0;">
-                      <div style="font-size:15px;line-height:1.8;color:#1a1b1c;text-align:left;width:100%;">
-                        %s
-                      </div>
-                    </div>
-                    """.replace("                    ", "") % pts[card_idx],
-                    unsafe_allow_html=True)
-
-            # 翻页按钮
-            col_p, col_n = st.columns(2)
-            if col_p.button("⬅️ 上一张", disabled=(card_idx == 0),
-                           use_container_width=True):
-                L["card_idx"] = card_idx - 1
-                st.rerun()
-            if col_n.button("下一张 ➡️", disabled=(card_idx >= total - 1),
-                           use_container_width=True):
-                L["card_idx"] = card_idx + 1
-                st.rerun()
-
-            # 快速跳选
-            with st.expander("跳转到指定卡片"):
-                jump = st.slider("卡片", 1, total, card_idx + 1,
-                                 key="card_jump")
-                if st.button("跳转", use_container_width=True):
-                    L["card_idx"] = jump - 1
-                    st.rerun()
+            # 卡片式学习（朗读联动，读完自动翻页）
+            _render_card_deck(pts)
 
         st.divider()
         b1, b2 = st.columns([3, 1])

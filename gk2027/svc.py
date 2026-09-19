@@ -156,7 +156,7 @@ def cmd_autostart() -> int:
 $ws = New-Object -ComObject WScript.Shell
 $l = $ws.CreateShortcut('%s')
 $l.TargetPath = '%s'
-$l.Arguments = '_autorun'
+$l.Arguments = 'svc.py _autorun'
 $l.WorkingDirectory = '%s'
 $l.Save()
 ''' % (lnk.replace("'", "''"), PYW.replace("'", "''"), BASE.replace("'", "''"))

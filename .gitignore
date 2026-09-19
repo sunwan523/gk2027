@@ -42,3 +42,26 @@ env/
 # Progress files (user-specific)
 data/progress.json
 data/plan_progress.json
+
+# SQLite databases (runtime data, regenerated via import scripts)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Logs / pid / temp
+*.log
+*.pid
+_smoke.pdf
+
+# Agent / tool working dirs
+.agents/
+.claude/
+.wrangler/
+
+# One-off scratch scripts and dumps (underscore-prefixed)
+/_*.py
+/_*.txt
+/gk2027/_*.py
+/gk2027/_*.txt
+/gk2027/_quizbank_backup/

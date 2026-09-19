@@ -172,8 +172,7 @@ FOR EACH ROW WHEN NEW.source_type NOT IN ({with_year})
              AND (NEW.year IS NOT NULL OR NEW.paper IS NOT NULL)
 BEGIN
     SELECT RAISE(ABORT,
-      '禁止：非真题来源不得填写 year/paper。这是旧项目最严重的错误，'
-      || '让编造的题顶着真实年份卷别出现。如需标注出处请用 source_ref。');
+      '禁止：非真题来源不得填写 year/paper。这是旧项目最严重的错误，让编造的题顶着真实年份卷别出现。如需标注出处请用 source_ref。');
 END;
 
 CREATE TRIGGER IF NOT EXISTS trg_no_fake_provenance_update
@@ -204,6 +203,10 @@ def connect(path: str | None = None) -> sqlite3.Connection:
     conn = sqlite3.connect(target, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
+    if path is None:
+        # 主库：任何部署点首次使用都必须有 schema（新环境主库没有其他建表入口）
+        conn.executescript(_render_schema())
+        conn.commit()
     return conn
 
 
