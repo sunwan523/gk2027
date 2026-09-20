@@ -209,6 +209,18 @@ async def api_lessons(req: Request, subject: str = "全部"):
         return JSONResponse({"error": "未登录"}, status_code=401)
     s = None if subject == "全部" else subject
     lessons = queue.available_lessons(c, subject=s)
+    # 追加已掌握课程（列表尾部带 ✅ 标记，可点击复习），让"学完的"在首页可见
+    try:
+        dq = ("SELECT * FROM knowledge_points WHERE status='已掌握'"
+              " AND id NOT IN ('eng_vocab','chn_dictation')")
+        args: tuple = ()
+        if s:
+            dq += " AND subject=?"
+            args = (s,)
+        lessons = lessons + [queue._lesson_row(c, r)
+                             for r in c.execute(dq, args).fetchall()]
+    except Exception:
+        pass
     if not lessons:
         state = {"empty": True, "kind": "done"}
         if s:
@@ -346,7 +358,7 @@ async def api_review(req: Request):
 
 
 # ----------------------------------------------------------------------
-# AI 出题（DeepSeek）
+# AI 出题（本地题库：3 选择 + 2 填空，稳定不依赖在线 AI）
 # ----------------------------------------------------------------------
 @app.post("/api/ai_quiz")
 async def api_ai_quiz(req: Request):
@@ -358,12 +370,18 @@ async def api_ai_quiz(req: Request):
     row = c.execute("SELECT subject, name FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
     if not row:
         return JSONResponse({"error": "知识点不存在"}, status_code=400)
-    pts = content.get_content(kp_id) or []
-    try:
-        qs = ai_quiz.generate_quiz(row["subject"], row["name"], pts, count=5)
-        return {"questions": qs}
-    except Exception as e:
-        return JSONResponse({"error": "AI出题失败：%s" % str(e)[:200]}, status_code=500)
+    qs = queue.start_lesson(c, kp_id)
+    if not qs:
+        return JSONResponse({"error": "该知识点暂无题库题目"}, status_code=404)
+    choices = [q for q in qs if q["qtype"] == "选择题"]
+    fills = [q for q in qs if q["qtype"] == "填空题"]
+    pick = choices[:3] + fills[:2]
+    used = {q["qid"] for q in pick}
+    pick += [q for q in qs if q["qid"] not in used][: max(0, 5 - len(pick))]
+    out = [{"qid": q["qid"], "qtype": q["qtype"], "stem": q["stem"],
+            "options": q["options"], "answer": q["answer"],
+            "analysis": q["analysis"], "source": "题库"} for q in pick]
+    return {"questions": out}
 
 
 @app.post("/api/ai_explain")

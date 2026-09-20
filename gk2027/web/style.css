@@ -282,6 +282,11 @@ textarea.input { min-height:84px; resize:vertical; }
 .tl-item { display:flex; gap:10px; padding:10px 0; border-bottom:1px solid #f0f1f4; }
 .tl-item .tl-date { flex:none; width:64px; font-size:12px; color:#888; text-align:right; line-height:1.5; }
 .tl-item .tl-body { flex:1; min-width:0; }
+.tl-head { display:flex; align-items:center; gap:8px; }
+.tl-del { margin-left:auto; border:none; background:none; font-size:14px; cursor:pointer; padding:4px 10px; opacity:.55; }
+.tl-del:active { opacity:1; }
+.lesson-card.lc-done { opacity:.8; }
+.lesson-card.lc-done .lc-name { color:#2e7d32; }
 .tl-item .tl-body img { width:56px; height:56px; border-radius:8px; object-fit:cover; margin:4px 4px 0 0; }
 .tl-item .tl-txt { font-size:13px; color:#333; line-height:1.6; word-break:break-word; }
 .tl-tag { display:inline-block; font-size:11px; border-radius:5px; padding:1px 6px; margin-bottom:3px; background:#eef1f6; color:#666; }

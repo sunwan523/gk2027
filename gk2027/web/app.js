@@ -321,18 +321,20 @@ async function renderLearn() {
     }
     if (!d.lessons.length) { list.innerHTML = `<div class="chart-card" style="text-align:center;color:#888;">暂无课程</div>`; return; }
     list.innerHTML = d.lessons.map(l => {
-      const cont = saved && saved.kp_id === l.kp_id &&
+      const done = l.status === "已掌握";
+      const cont = !done && saved && saved.kp_id === l.kp_id &&
         (saved.card_idx > 0 || saved.phase !== "learn" || saved.q_idx > 0 ||
          (saved.results || []).length > 0);
-      return `<div class="lesson-card">
+      return `<div class="lesson-card${done ? " lc-done" : ""}">
         <div class="lc-main">
           <div class="lc-name">${iconOf(l.status)} ${esc(l.subject)}·${esc(l.name)}</div>
-          <div class="lc-sub">掌握度 ${l.mastery}%｜自检题 ${l.q_done}/${l.q_total}｜约 ${l.minutes} 分钟</div>
+          <div class="lc-sub">${done ? "<b>✅ 已掌握</b> · 掌握度 " : "掌握度 "}${l.mastery}%｜自检题 ${l.q_done}/${l.q_total}｜约 ${l.minutes} 分钟</div>
         </div>
         <div class="lc-actions">
-          ${cont ? `<button class="lc-go" data-kp="${esc(l.kp_id)}">继续 ▶</button>
+          ${done ? `<button class="lc-go" data-kp="${esc(l.kp_id)}">复习</button>`
+            : (cont ? `<button class="lc-go" data-kp="${esc(l.kp_id)}">继续 ▶</button>
           <button class="lc-restart" data-kp="${esc(l.kp_id)}">↺ 重学</button>`
-          : `<button class="lc-go" data-kp="${esc(l.kp_id)}">开始</button>`}
+            : `<button class="lc-go" data-kp="${esc(l.kp_id)}">开始</button>`)}
         </div>
       </div>`;
     }).join("");
@@ -718,7 +720,16 @@ async function renderAiQuiz() {
       A.questions = d.questions || [];
       A.phase = "q";
       renderAiQuiz();
-    } catch (e) { toast(e.message); A.phase = "q"; renderAiQuiz(); }
+    } catch (e) {
+      if (!A.questions || !A.questions.length) {
+        el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitAi">← 返回列表</button></div>
+        <div class="chart-card" style="color:#d9534f;padding:26px;">出题失败：${esc(e.message)}
+          <div class="cap" style="color:#888;margin-top:6px;">题库里暂时没有该知识点的题目，可先返回课程完成自检题。</div></div>`;
+        const ae = $("#exitAi"); if (ae) ae.onclick = () => { A.cancelled = true; exitToLearn(); };
+        return;
+      }
+      toast(e.message); A.phase = "q"; renderAiQuiz();
+    }
     return;
   }
   if (A.idx >= (A.questions || []).length) {
@@ -1192,7 +1203,9 @@ function renderTimeline(items) {
     <div class="tl-item">
       <div class="tl-date">${esc(it.date)}<br><span style="font-size:11px;">${esc((it.created_at || "").slice(11, 16))}</span></div>
       <div class="tl-body">
-        <span class="tl-tag">${it.label}</span>
+        <div class="tl-head"><span class="tl-tag">${it.label}</span>
+          <button class="tl-del" onclick="delDiary(${Number(it.id) || 0})" title="删除这条记录">🗑</button>
+        </div>
         ${it.is_private && it.locked ? `<div class="locked-note">🔒 隐秘内容（需高级密码）</div>`
           : `<div class="tl-txt">${esc(it.mood ? "【" + it.mood + "】" : "")}${esc(it.text || it.summary || "")}</div>`}
         ${it.category ? `<div class="dv-meta">分类：${esc(it.category)}${it.summary ? " · " + esc(it.summary) : ""}</div>` : ""}
