@@ -436,12 +436,13 @@ function renderLesson() {
       </div>
       <div id="deckWrap"></div>
       <div id="aiExplainBox"></div>
-      <div class="deck-cta">
-        <button class="btn light" id="toQuiz">开始练习 ✏️</button>
-      </div>`;
+      <button class="deck-tab" id="deckTab" hidden title="展开播放控制">✍️</button>`;
     renderDeck(L.points);
     $("#exitLearn").onclick = exitToLearn;
-    $("#toQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
+    $("#deckTab").onclick = () => {
+      const p = $(".deck-player"); if (p) p.classList.remove("collapsed");
+      $("#deckTab").hidden = true;
+    };
     $("#helpAi").onclick = async () => {
       const box = $("#aiExplainBox");
       const overlay = (inner) => `<div class="ae-overlay"><div class="ae-panel">${inner}</div></div>`;
@@ -605,6 +606,7 @@ function renderDeck(points) {
     <div class="deck-player">
       <div class="tts-row">
         <span class="tts-side">
+          <button class="tts-mini" id="toQuizPen" title="开始练习">🖊</button>
           <button class="tts-mini" id="deckAuto" title="自动翻页">${deck.auto ? "🔁" : "⏹"}</button>
           <button class="tts-spd" id="ttsRateBtn" title="语速">语速▾</button>
           <button class="tts-spd" id="ttsFontBtn" title="字号">字号▾</button>
@@ -613,6 +615,7 @@ function renderDeck(points) {
         <span class="tts-side tts-right">
           <button class="tts-turn" id="deckPrev" title="上一张">上一页</button>
           <button class="tts-turn" id="deckNext" title="下一张">下一页</button>
+          <button class="tts-mini" id="deckCollapse" title="收起控制">›</button>
         </span>
       </div>
       <div class="tts-pop" id="ttsRatePop" hidden>
@@ -648,6 +651,13 @@ function deckReadFrom(i, points) {
 function bindDeck(points) {
   $("#deckPrev").onclick = () => deckTurnTo(deck.idx - 1, points);
   $("#deckNext").onclick = () => deckTurnTo(deck.idx + 1, points);
+  const pen = $("#toQuizPen");
+  if (pen) pen.onclick = () => { lesson.phase = "q"; lesson.idx = 0; renderLesson(); };
+  const col = $("#deckCollapse");
+  if (col) col.onclick = () => {
+    const p = $(".deck-player"); if (p) p.classList.add("collapsed");
+    const t = $("#deckTab"); if (t) t.hidden = false;
+  };
   $("#deckAuto").onclick = () => { deck.auto = !deck.auto; $("#deckAuto").textContent = deck.auto ? "🔁" : "⏹"; };
   const rbtn = $("#ttsRateBtn"), rpop = $("#ttsRatePop");
   if (rbtn && rpop) {
