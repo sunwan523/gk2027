@@ -444,22 +444,27 @@ function renderLesson() {
     $("#toQuiz").onclick = () => { L.phase = "q"; L.idx = 0; renderLesson(); };
     $("#helpAi").onclick = async () => {
       const box = $("#aiExplainBox");
-      box.innerHTML = `<div class="spinner" style="padding:14px;">🤖 老师正在讲…</div>`;
+      const overlay = (inner) => `<div class="ae-overlay"><div class="ae-panel">${inner}</div></div>`;
+      box.innerHTML = overlay(`<div class="spinner" style="padding:18px;">🤖 老师正在讲…</div>`);
+      const ov = box.querySelector(".ae-overlay");
+      if (ov) ov.onclick = (e) => { if (e.target === ov) { box.innerHTML = ""; ttsStop(); } };
       try {
         const d = await post("/api/ai_explain", { kp_id: L.kp_id, text: (L.points[deck.idx] || "") });
         const plain = (d.explain || "").trim();
-        box.innerHTML = `<div class="ai-explain">
+        box.innerHTML = overlay(`<div class="ai-explain">
           <div class="ae-head">🤖 AI 讲懂 · ${esc(L.name)}
             <button class="ae-speak" id="aeSpeak">🔊 朗读讲解</button>
             <button class="ae-close" id="aeClose">✕</button></div>
-          <div class="ae-body">${markdownish(plain)}</div></div>`;
+          <div class="ae-body">${markdownish(plain)}</div></div>`);
         $("#aeClose").onclick = () => { box.innerHTML = ""; ttsStop(); };
         $("#aeSpeak").onclick = () => {
           const paras = plain.split(/\n+/).map(x => x.replace(/^[-*•#\s]+/, "").trim()).filter(Boolean);
           if (paras.length) ttsSpeak(paras);
         };
       } catch (e) {
-        box.innerHTML = `<div class="fb-wrong">${esc(e.message)}</div>`;
+        box.innerHTML = overlay(`<div class="fb-wrong">${esc(e.message)}</div>
+          <button class="btn ghost mt12" id="aeClose2">关闭</button>`);
+        const c2 = $("#aeClose2"); if (c2) c2.onclick = () => { box.innerHTML = ""; };
       }
     };
     return;

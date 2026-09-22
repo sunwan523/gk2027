@@ -15,6 +15,9 @@
 .deck-tap.left { left:0; }
 .deck-tap.right { right:0; }
 .ai-explain { background:#fffdf5; border:1px solid #f0e2b8; border-radius:10px; padding:10px 12px; font-size:14px; line-height:1.8; margin-bottom:8px; }
+.ae-overlay { position:fixed; inset:0; z-index:80; background:rgba(20,24,40,.42); display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box; }
+.ae-panel { width:100%; max-width:560px; max-height:74vh; overflow:auto; -webkit-overflow-scrolling:touch; }
+.ae-panel .ai-explain { margin:0; box-shadow:0 8px 30px rgba(0,0,0,.18); }
 .ae-head { display:flex; align-items:center; gap:8px; font-weight:600; margin-bottom:6px; font-size:13px; flex-wrap:wrap; }
 .ae-speak { background:#fff; border:1px solid #f0e2b8; border-radius:6px; padding:2px 8px; font-size:12px; cursor:pointer; }
 .ae-close { margin-left:auto; background:none; border:none; font-size:15px; cursor:pointer; color:#999; }
