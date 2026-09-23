@@ -23,7 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import SUBJECTS, ATTRIBUTIONS
-from core import db, graph, queue, content, users, ai_quiz, study_advisor
+from core import db, graph, queue, content, users, ai_quiz, study_advisor, recite_lib
 
 try:
     import edge_tts  # 在线语音（微软 Edge TTS，音色丰富）
@@ -486,30 +486,96 @@ async def api_ai_advice(req: Request):
 # ----------------------------------------------------------------------
 # 背诵内容
 # ----------------------------------------------------------------------
-RECITE_CATALOG = {
-    "语文": [
-        ("chn_dictation", "名句名篇默写"),
-        ("chn_wenyan_word", "文言文120实词"),
-        ("chn_essay_material", "作文素材库"),
-        ("chn_read_argue", "现代文答题模板"),
-    ],
-    "英语": [
-        ("eng_vocab", "核心词汇3500"),
-        ("eng_write_apply", "作文万能模板"),
-        ("eng_grammar_fill", "语法填空高频考点"),
-    ],
-}
+def _recite_cats():
+    """{科目: [[全局cat_id, 分类名, 条目数]]}，cat_id 跨科目唯一"""
+    out = {}
+    gid = 0
+    for subj, cats in recite_lib.RECITE_LIB.items():
+        out[subj] = []
+        for cname, items in cats.items():
+            out[subj].append([gid, cname, len(items)])
+            gid += 1
+    return out
+
+
+def _recite_cat_by_id(cid: int):
+    gid = 0
+    for cats in recite_lib.RECITE_LIB.values():
+        for cname, items in cats.items():
+            if gid == cid:
+                return cname, items
+            gid += 1
+    return None, []
 
 
 @app.get("/api/recite_catalog")
-def api_recite_catalog():
-    return RECITE_CATALOG
+async def api_recite_catalog(req: Request):
+    c, u = _conn_for(req)
+    done = set(db.get_setting(c, "recite_done", []) or []) if c else set()
+    out = {}
+    gid = 0
+    for subj, cats in recite_lib.RECITE_LIB.items():
+        out[subj] = []
+        for cname, items in cats.items():
+            d = sum(1 for it in items if it["id"] in done)
+            out[subj].append([gid, cname, len(items), d])
+            gid += 1
+    return out
 
 
-@app.get("/api/recite/{kp_id}")
-def api_recite(kp_id: str):
-    content.reload_content()
-    return {"items": content.get_content(kp_id) or []}
+@app.get("/api/recite/{cat_id}")
+def api_recite(cat_id: int):
+    cname, items = _recite_cat_by_id(int(cat_id))
+    return {"cat": cname, "items": items or []}
+
+
+SETTING_KEYS = ["tts_rate", "tts_font", "tts_auto", "tts_voices_multi"]
+
+
+@app.get("/api/settings")
+async def api_settings_get(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    return {k: db.get_setting(c, k, None) for k in SETTING_KEYS}
+
+
+@app.post("/api/settings")
+async def api_settings_post(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    body = await req.json() or {}
+    for k in SETTING_KEYS:
+        if k in body and body[k] is not None:
+            db.set_setting(c, k, body[k])
+    return {"ok": True}
+
+
+@app.get("/api/recite_progress")
+async def api_recite_progress(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    return {"done": db.get_setting(c, "recite_done", []) or []}
+
+
+@app.post("/api/recite_done")
+async def api_recite_done(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    body = await req.json() or {}
+    item_id = str(body.get("item_id", ""))
+    done = bool(body.get("done"))
+    if not item_id:
+        return {"ok": False}
+    arr = db.get_setting(c, "recite_done", []) or []
+    arr = [x for x in arr if x != item_id]
+    if done:
+        arr.append(item_id)
+    db.set_setting(c, "recite_done", arr)
+    return {"ok": True}
 
 
 # ----------------------------------------------------------------------

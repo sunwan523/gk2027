@@ -28,6 +28,7 @@ const post = (path, body) => api(path, { method: "POST", body: JSON.stringify(bo
 
 // ---------- 朗读（在线 Edge TTS 优先，系统语音后备） ----------
 let tts = { voices: [], voice: null, multi: [], rate: 1, font: 18, pitch: 1, playing: false, utter: null, queue: [], idx: 0, onDone: null, online: [], audio: null };
+let ttsAuto = true;
 function saveMulti() {
   try { localStorage.setItem("tts_voices_multi", JSON.stringify(tts.multi.map(v => v.name))); } catch (e) {}
 }
@@ -230,13 +231,14 @@ const SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物"];
 
 // ---------- 页面切换 ----------
 const PAGE_ACT = {
-  tabLearn: "浏览", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出", tabSpace: "空间",
+  tabLearn: "浏览", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出", tabSpace: "空间", tabMine: "我的", tabSettings: "设置",
 };
 function switchTab(tabId) {
   $$(".tab-page").forEach(p => p.classList.add("hidden"));
   $$(".nav-btn").forEach(b => b.classList.remove("active"));
   $("#" + tabId).classList.remove("hidden");
-  $$(".nav-btn").find(b => b.dataset.tab === tabId).classList.add("active");
+  const _nb = $$(".nav-btn").find(b => b.dataset.tab === tabId);
+  if (_nb) _nb.classList.add("active");
   reportAct(PAGE_ACT[tabId]);
   if (tabId === "tabLearn") renderLearn();
   if (tabId === "tabReview") renderReview();
@@ -244,6 +246,8 @@ function switchTab(tabId) {
   if (tabId === "tabRecite") renderRecite();
   if (tabId === "tabExport") renderExport();
   if (tabId === "tabSpace") renderSpace();
+  if (tabId === "tabMine") renderMine();
+  if (tabId === "tabSettings") renderSettings();
   window.scrollTo(0, 0);
 }
 
@@ -256,7 +260,7 @@ async function refreshHeader() {
       ? `<img class="h-av" src="/${esc(me.avatar)}" alt="">`
       : `<span class="h-av h-av-t">${esc(String(nm).slice(0, 1))}</span>`;
     $("#headerBar").innerHTML =
-      `<button class="h-user" onclick="switchTab('tabSpace')">${av}<span>${esc(nm)}</span></button>` +
+      `<button class="h-user" onclick="switchTab('tabMine')">${av}<span>${esc(nm)}</span></button>` +
       `<span class="h-stat">🔥 ${d.streak} 天</span>` +
       `<span class="h-stat">🏆 ${d.mastered}/${d.total}</span>` +
       `<span class="h-xp">今日 XP ${d.xp_today}/${d.xp_goal} ${d.goal_done ? "✅" : ""}` +
@@ -287,6 +291,7 @@ async function enterApp() {
   $("#loginPage").classList.add("hidden");
   $("#mainPage").classList.remove("hidden");
   await refreshHeader();
+  await loadSettings();
   switchTab("tabLearn");
 }
 
@@ -588,7 +593,7 @@ function renderLessonDone(L) {
 }
 
 // ---------- 知识点卡片（朗读 + 自动翻页） ----------
-let deck = { idx: 0, auto: true, speak: false };
+let deck = { idx: 0, auto: ttsAuto, speak: false };
 function renderDeck(points) {
   if (!points || !points.length) return;
   deck.idx = Math.min(deck.idx, points.length - 1);
@@ -849,14 +854,151 @@ function drawReviewCard() {
   };
 }
 
+// ---------- 我的 ----------
+async function renderMine() {
+  const el = $("#tabMine");
+  let d = null;
+  let nm = (me && me.nickname) || (me && me.name) || "";
+  let av = null;
+  try {
+    d = await api("/api/header");
+    const p = await api("/api/profile").catch(() => ({}));
+    if (p && p.nickname) nm = p.nickname;
+    if (p && p.avatar) av = p.avatar;
+  } catch (e) {}
+  el.innerHTML = `
+    <div class="mine-card">
+      <div class="m-av">${av ? `<img src="/${esc(av)}" alt="">` : esc(String(nm).slice(0, 1) || "我")}</div>
+      <div class="m-name">${esc(nm || "同学")}</div>
+      <div class="m-stats">
+        <span>🔥 连签 ${d ? d.streak : 0} 天</span>
+        <span>🏆 掌握 ${d ? d.mastered : 0}/${d ? d.total : 0}</span>
+        <span>📈 今日 XP ${d ? d.xp_today : 0}</span>
+      </div>
+    </div>
+    <div class="mine-menu">
+      <button class="m-item" data-goto="tabRecite">📖 背诵听读</button>
+      <button class="m-item" data-goto="tabStats">📊 学习统计</button>
+      <button class="m-item" data-goto="tabExport">📄 导出 PDF</button>
+      <button class="m-item" data-goto="tabSettings">⚙️ 设置</button>
+      <button class="m-item" data-goto="tabSpace">🔒 其它</button>
+    </div>
+    <div class="cap" style="text-align:center;margin-top:18px;">90 天高考复习 · 坚持就是胜利 💪</div>`;
+  el.querySelectorAll(".m-item").forEach(b => b.onclick = () => {
+    if (b.dataset.goto === "tabSpace") { gateSpace(); return; }
+    switchTab(b.dataset.goto);
+  });
+}
+
+// 空间入口密码门禁（家庭内部使用，前端校验）
+const SPACE_GATE_PWD = "5235";
+function gateSpace() {
+  const old = document.getElementById("gateBox");
+  if (old) old.remove();
+  const box = document.createElement("div");
+  box.className = "gate-overlay";
+  box.id = "gateBox";
+  box.innerHTML = `<div class="gate-panel">
+      <h4>🔒 其它</h4>
+      <input type="password" id="gatePwd" placeholder="请输入密码" autocomplete="off">
+      <div class="gate-acts">
+        <button id="gateOk" class="btn primary">打开</button>
+        <button id="gateNo" class="btn">取消</button>
+      </div>
+    </div>`;
+  document.body.appendChild(box);
+  const input = box.querySelector("#gatePwd");
+  input.focus();
+  const close = () => box.remove();
+  box.querySelector("#gateNo").onclick = close;
+  box.addEventListener("click", (e) => { if (e.target === box) close(); });
+  const open = () => {
+    if (input.value === SPACE_GATE_PWD) { close(); switchTab("tabSpace"); }
+    else { toast("密码错误"); input.value = ""; input.focus(); }
+  };
+  box.querySelector("#gateOk").onclick = open;
+  input.onkeydown = (e) => { if (e.key === "Enter") open(); };
+}
+
+// ---------- 全局设置（朗读/字号/自动翻页，按用户存服务端） ----------
+async function loadSettings() {
+  try {
+    const d = await api("/api/settings");
+    if (d && d.ok === false) return;
+    if (d) {
+      if (d.tts_rate != null) { tts.rate = parseFloat(d.tts_rate) || 1; localStorage.setItem("tts_rate", String(tts.rate)); }
+      if (d.tts_font != null) { tts.font = parseInt(d.tts_font) || 18; localStorage.setItem("tts_font", String(tts.font)); }
+      if (d.tts_auto != null) { ttsAuto = !!d.tts_auto; deck.auto = ttsAuto; }
+      if (Array.isArray(d.tts_voices_multi) && d.tts_voices_multi.length) {
+        localStorage.setItem("tts_voices_multi", JSON.stringify(d.tts_voices_multi));
+      }
+    }
+  } catch (e) {}
+  ttsLoadVoices();
+}
+
+async function renderSettings() {
+  const el = $("#tabSettings");
+  el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>⚙️ 设置</h3>
+    <div class="cap">全局朗读与显示设置 · 按用户保存，换设备也生效</div>
+    <div class="set-card">
+      <div class="set-title">🔊 朗读音色</div>
+      <div class="cap">可多选：朗读时按条轮换使用；至少保留一个</div>
+      <div id="setVoice" class="voice-box"></div>
+    </div>
+    <div class="set-card">
+      <div class="set-title">🚀 朗读语速</div>
+      <div class="set-opts" id="setRate">
+        <button data-r="1">1x</button><button data-r="1.5">1.5x</button><button data-r="2">2x</button>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-title">🔤 内容字号</div>
+      <div class="set-opts" id="setFont">
+        <button data-f="16">小</button><button data-f="18">中</button><button data-f="20">大</button><button data-f="22">特大</button>
+      </div>
+    </div>
+    <div class="set-card">
+      <div class="set-title">🔁 朗读自动翻页</div>
+      <div class="set-opts"><button id="setAuto" class="switch">${ttsAuto ? "开" : "关"}</button></div>
+    </div>
+    <button class="btn primary" id="saveSettings" style="width:100%;margin-top:16px;padding:12px;">保存设置</button>
+    <div class="cap" style="text-align:center;margin-top:10px;">保存后立即生效，学习页/背诵页共用</div>`;
+  fillVoiceSel();
+  const mk = (id, dataKey, cur) => {
+    const box = $("#" + id);
+    if (!box) return;
+    box.querySelectorAll("button").forEach(b => {
+      b.classList.toggle("on", String(b.dataset[dataKey]) === String(cur));
+      b.onclick = () => { box.querySelectorAll("button").forEach(x => x.classList.remove("on")); b.classList.add("on"); };
+    });
+  };
+  mk("setRate", "r", tts.rate);
+  mk("setFont", "f", tts.font);
+  const sa = $("#setAuto");
+  if (sa) sa.onclick = () => { ttsAuto = !ttsAuto; sa.textContent = ttsAuto ? "开" : "关"; sa.classList.toggle("on", ttsAuto); };
+  $("#saveSettings").onclick = async () => {
+    const r = $("#setRate .on"); if (r) tts.rate = parseFloat(r.dataset.r);
+    const f = $("#setFont .on"); if (f) tts.font = parseInt(f.dataset.f);
+    const names = (tts.multi || []).map(v => v.name);
+    localStorage.setItem("tts_rate", String(tts.rate));
+    localStorage.setItem("tts_font", String(tts.font));
+    localStorage.setItem("tts_auto", ttsAuto ? "1" : "0");
+    localStorage.setItem("tts_voices_multi", JSON.stringify(names));
+    deck.auto = ttsAuto;
+    try { await post("/api/settings", { tts_rate: tts.rate, tts_font: tts.font, tts_auto: ttsAuto, tts_voices_multi: names }); } catch (e) {}
+    toast("设置已保存 ✓");
+  };
+}
+
 // ---------- 统计 ----------
 async function renderStats() {
   const el = $("#tabStats");
-  el.innerHTML = `<h3>📊 学习统计</h3><div class="spinner">加载中…</div>`;
+  el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>📊 学习统计</h3><div class="spinner">加载中…</div>`;
   try {
     const d = await api("/api/stats");
     const t = d.time;
-    el.innerHTML = `<h3>📊 学习统计</h3>
+    el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>📊 学习统计</h3>
       <div class="metric-row">
         <div class="metric"><div class="m-val">${t.today_min}</div><div class="m-label">今日（分）</div></div>
         <div class="metric"><div class="m-val">${t.week_min}</div><div class="m-label">本周（分）</div></div>
@@ -919,73 +1061,112 @@ function markdownish(txt) {
   return s;
 }
 
-// ---------- 背诵 ----------
-let recite = { subject: "语文", catIdx: 0, items: [], kpId: "", kw: "" };
+// ---------- 背诵（卡片式：逐篇原文 + 已背/待背） ----------
+let recite = { subject: "语文", catIdx: 0, catId: "", kw: "", items: [], done: {}, openId: "" };
 let reciteCatalog = null;
+
 async function renderRecite() {
   const el = $("#tabRecite");
   if (!reciteCatalog) {
-    el.innerHTML = `<h3>📖 背诵听读</h3><div class="spinner">加载中…</div>`;
+    el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>📖 背诵听读</h3><div class="spinner">加载中…</div>`;
     try { reciteCatalog = await api("/api/recite_catalog"); } catch (e) { el.innerHTML = `<div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`; return; }
+    try { const pr = await api("/api/recite_progress"); (pr.done || []).forEach(x => recite.done[x] = true); } catch (e) {}
   }
   const cats = reciteCatalog[recite.subject] || [];
+  if (!cats.length) { el.innerHTML = `<div class="chart-card">暂无背诵内容</div>`; return; }
   if (recite.catIdx >= cats.length) recite.catIdx = 0;
-  const [kpId, catName] = cats[recite.catIdx] || ["", ""];
-  recite.kpId = kpId;
-  el.innerHTML = `<h3>📖 背诵听读</h3>
-    <div class="cap">出门随身背：选分类→逐条听读，已背打勾自动保存</div>
-    <div class="subj-filter">${Object.keys(reciteCatalog).map(s =>
+  const [catId, catName, total] = cats[recite.catIdx];
+  recite.catId = String(catId);
+  el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>📖 背诵听读</h3>
+    <div class="cap">逐篇卡片：点开看原文、听朗读，背完打勾自动保存</div>
+    <div class="recite-subj">${Object.keys(reciteCatalog).map(s =>
       `<button class="${s === recite.subject ? "active" : ""}" data-s="${s}">${s}</button>`).join("")}</div>
     <div class="recite-cat">${cats.map((c, i) =>
-      `<button class="${i === recite.catIdx ? "active" : ""}" data-i="${i}">${esc(c[1])}</button>`).join("")}</div>
-    <input class="recite-search" id="reciteKw" placeholder="🔍 搜索关键词（留空显示全部）" value="${esc(recite.kw)}">
-    <div class="recite-count" id="reciteCount">…</div>
+      `<button class="${i === recite.catIdx ? "active" : ""}" data-i="${i}">${esc(c[1])} ${c[3] || 0}/${c[2]}</button>`).join("")}</div>
+    <input class="recite-search" id="reciteKw" placeholder="🔍 在当前分类内搜索篇目/原文" value="${esc(recite.kw)}">
+    <div class="recite-prog"><div class="rp-bar"><div class="rp-fill" id="rpFill" style="width:0%"></div></div><span class="rp-txt" id="rpTxt">…</span></div>
     <div id="reciteBody"><div class="spinner">加载中…</div></div>`;
-  el.querySelectorAll(".subj-filter button").forEach(b => b.onclick = () => { recite.subject = b.dataset.s; recite.catIdx = 0; renderRecite(); });
-  el.querySelectorAll(".recite-cat button").forEach(b => b.onclick = () => { recite.catIdx = parseInt(b.dataset.i); renderRecite(); });
-  $("#reciteKw").oninput = (e) => { recite.kw = e.target.value; filterRecite(); };
+  el.querySelectorAll(".recite-subj button").forEach(b => b.onclick = () => { recite.subject = b.dataset.s; recite.catIdx = 0; recite.kw = ""; renderRecite(); });
+  el.querySelectorAll(".recite-cat button").forEach(b => b.onclick = () => { recite.catIdx = parseInt(b.dataset.i); recite.kw = ""; renderRecite(); });
+  $("#reciteKw").oninput = (e) => { recite.kw = e.target.value; renderReciteList(); };
+  await loadReciteCat(catId);
+}
+
+async function loadReciteCat(catId) {
+  recite.catId = catId;
+  recite.openId = "";
   try {
-    const d = await api("/api/recite/" + encodeURIComponent(kpId));
+    const d = await api("/api/recite/" + encodeURIComponent(catId));
     recite.items = d.items || [];
-    reportAct("背诵", recite.subject, kpId);
-    filterRecite();
-  } catch (e) { $("#reciteBody").innerHTML = `<div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`; }
+    reportAct("背诵", recite.subject, String(catId));
+  } catch (e) { recite.items = []; }
+  renderReciteList();
 }
-function filterRecite() {
-  const items = recite.kw ? recite.items.filter(p => p.toLowerCase().includes(recite.kw.toLowerCase())) : recite.items;
-  const done = reciteDoneSet(recite.kpId);
-  $("#reciteCount").textContent = `共 ${items.length} 条`;
+
+function renderReciteList() {
+  const items = recite.kw ? recite.items.filter(it =>
+    (it.title || "").toLowerCase().includes(recite.kw.toLowerCase()) ||
+    (it.author || "").includes(recite.kw) ||
+    (it.text || "").includes(recite.kw)) : recite.items;
+  const doneN = items.filter(it => recite.done[it.id]).length;
+  $("#rpFill").style.width = items.length ? Math.round(doneN / items.length * 100) + "%" : "0%";
+  $("#rpTxt").textContent = `已背 ${doneN}/${items.length}`;
   const box = $("#reciteBody");
+  if (!items.length) { box.innerHTML = `<div class="chart-card" style="text-align:center;color:#888;">没有匹配内容</div>`; return; }
   box.innerHTML = `<div class="tts-bar"><div class="tts-row">
-      <button class="tts-btn" onclick="ttsSpeak(${JSON.stringify(items).replace(/"/g, "&quot;")})">▶️ 全部连播</button>
+      <button class="tts-btn" onclick="reciteAllPlay()">▶️ 全部连播</button>
       <button class="tts-btn" onclick="ttsStop()">⏹ 停止</button>
-      <span style="font-size:10px;color:#888;margin-left:auto;">已背 ${done.size}/${items.length}</span>
+      <span style="font-size:10px;color:#888;margin-left:auto;">点击卡片展开原文</span>
     </div></div>` +
-    items.map((p, i) => {
-      const isDone = done.has(i);
-      return `<div class="recite-item ${isDone ? "done" : ""}">
-        <input type="checkbox" ${isDone ? "checked" : ""} data-i="${i}">
-        <div class="r-text">${esc(p)}</div>
-        <button class="tts-mini" data-i="${i}">🔊</button></div>`;
-    }).join("") || `<div class="chart-card" style="text-align:center;color:#888;">没有匹配内容</div>`;
-  box.querySelectorAll(".recite-item input[type=checkbox]").forEach(cb => cb.onchange = () => toggleReciteDone(recite.kpId, parseInt(cb.dataset.i), cb.checked));
-  box.querySelectorAll(".tts-mini").forEach(b => b.onclick = () => ttsSpeak([items[parseInt(b.dataset.i)]]));
+    items.map(it => {
+      const isDone = !!recite.done[it.id];
+      const open = recite.openId === it.id;
+      const sum = (it.text || "").replace(/\n/g, " ").slice(0, 42);
+      return `<div class="r-card ${isDone ? "done-card" : ""} ${open ? "open" : ""}" data-id="${esc(it.id)}">
+        <div class="r-head">
+          <div><div class="r-title">${esc(it.title)}${it.author ? `<span class="r-author">${esc(it.author)}</span>` : ""}</div>
+          <div class="r-sum">${esc(sum)}</div></div>
+          <span class="r-badge ${isDone ? "done" : "todo"}">${isDone ? "✓ 已背" : "待背诵"}</span>
+          <span class="r-arrow">▾</span>
+        </div>
+        <div class="r-body">
+          <div class="r-text">${esc(it.text)}</div>
+          <div class="r-acts">
+            <button class="r-listen" data-id="${esc(it.id)}">🔊 朗读</button>
+            <button class="r-donebtn ${isDone ? "on" : ""}" data-id="${esc(it.id)}">${isDone ? "✓ 已背（点取消）" : "✔ 标记已背"}</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+  box.querySelectorAll(".r-head").forEach(h => h.onclick = () => {
+    const id = h.closest(".r-card").dataset.id;
+    recite.openId = recite.openId === id ? "" : id;
+    renderReciteList();
+  });
+  box.querySelectorAll(".r-listen").forEach(b => b.onclick = (e) => {
+    e.stopPropagation();
+    const it = recite.items.find(x => x.id === b.dataset.id);
+    if (it) ttsSpeak([it.text]);
+  });
+  box.querySelectorAll(".r-donebtn").forEach(b => b.onclick = async (e) => {
+    e.stopPropagation();
+    const id = b.dataset.id;
+    const now = !recite.done[id];
+    recite.done[id] = now;
+    try { await api("/api/recite_done", { method: "POST", body: JSON.stringify({ item_id: id, done: now }) }); } catch (err) {}
+    renderReciteList();
+  });
 }
-function reciteDoneKey(kpId) { return "recite_done_" + kpId; }
-function reciteDoneSet(kpId) {
-  try { return new Set(JSON.parse(localStorage.getItem(reciteDoneKey(kpId)) || "[]")); } catch (e) { return new Set(); }
-}
-function toggleReciteDone(kpId, i, checked) {
-  const s = reciteDoneSet(kpId);
-  checked ? s.add(i) : s.delete(i);
-  localStorage.setItem(reciteDoneKey(kpId), JSON.stringify(Array.from(s).sort((a, b) => a - b)));
-  filterRecite();
+
+function reciteAllPlay() {
+  const texts = recite.items.map(it => it.text).filter(Boolean);
+  if (texts.length) ttsSpeak(texts);
 }
 
 // ---------- 导出 ----------
 function renderExport() {
   const el = $("#tabExport");
-  el.innerHTML = `<h3>📄 导出 PDF</h3>
+  el.innerHTML = `<button class="sub-back" onclick="switchTab('tabMine')">← 我的</button><h3>📄 导出 PDF</h3>
     <div class="cap">生成的 PDF 可发送到电脑打印，或手机连打印机直接打。</div>
     <div class="export-card"><p>每日学习单＝按你当前进度排（已掌握的自动跳过）。排多少天？</p>
       <input type="range" id="expDays" min="7" max="90" step="1" value="30" style="width:100%;">
@@ -1070,6 +1251,7 @@ async function renderSpace() {
   const bd = (profile && profile.birthday) || "";
   const cover = (profile && profile.cover) || "";
   el.innerHTML = `
+  <button class="sub-back sub-back-space" onclick="switchTab('tabMine')">← 我的</button>
   <div class="qq-cover${cover ? " has-cover" : ""}"${cover ? ` style="background-image:url('/${esc(cover)}')"` : ""}>
     <div class="cover-mask"></div>
     <div class="cover-deco d1"></div><div class="cover-deco d2"></div><div class="cover-deco d3"></div>
