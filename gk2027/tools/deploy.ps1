@@ -15,7 +15,7 @@ $ROUTER = 'root@192.168.100.88'
 $IMG = 'ghcr.io/sunwan523/gk2027-mobile:latest'
 
 Write-Host "[1/3] git push GitHub ..."
-git -C $root push 2>&1
+git -C 'D:\codex\gaokao' push gk2027 master 2>&1
 
 Write-Host "[2/3] 构建并推送 ghcr 镜像 ..."
 & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $root 'build-image.ps1') 2>&1
