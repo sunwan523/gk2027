@@ -231,7 +231,7 @@ const SUBJECTS = ["语文", "数学", "英语", "物理", "化学", "生物"];
 
 // ---------- 页面切换 ----------
 const PAGE_ACT = {
-  tabLearn: "浏览", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出", tabSpace: "空间", tabMine: "我的", tabSettings: "设置",
+  tabLearn: "浏览", tabExam: "模考", tabReview: "复习", tabStats: "统计", tabRecite: "背诵", tabExport: "导出", tabSpace: "空间", tabMine: "我的", tabSettings: "设置",
 };
 function switchTab(tabId) {
   $$(".tab-page").forEach(p => p.classList.add("hidden"));
@@ -241,6 +241,7 @@ function switchTab(tabId) {
   if (_nb) _nb.classList.add("active");
   reportAct(PAGE_ACT[tabId]);
   if (tabId === "tabLearn") renderLearn();
+  if (tabId === "tabExam") renderExam();
   if (tabId === "tabReview") renderReview();
   if (tabId === "tabStats") renderStats();
   if (tabId === "tabRecite") renderRecite();
@@ -271,19 +272,44 @@ async function refreshHeader() {
 
 // ---------- 登录 ----------
 async function renderLogin() {
-  const d = await api("/api/users");
   const box = $("#loginUsers");
-  box.innerHTML = d.users.map(u =>
-    `<button class="user-btn" data-id="${esc(u.id)}" data-name="${esc(u.name)}">🧑 ${esc(u.name)}</button>`).join("");
-  box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => login(b.dataset.name));
+  try {
+    const m = await api("/api/auth_mode");
+    $("#loginCode").hidden = !m.need_code;
+  } catch (e) { /* 忽略 */ }
+  let users = [];
+  try {
+    users = (await api("/api/users")).users || [];     // 需登录，未登录时回退本地记录
+    try { localStorage.setItem("gk_last_users", JSON.stringify(users.map(u => u.name))); } catch (e) {}
+  } catch (e) {
+    try { users = (JSON.parse(localStorage.getItem("gk_last_users") || "[]")).map(n => ({ name: n })); } catch (e2) { users = []; }
+  }
+  box.innerHTML = users.map(u =>
+    `<button class="user-btn" data-name="${esc(u.name)}">🧑 ${esc(u.name)}</button>`).join("");
+  box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => {
+    $("#newName").value = b.dataset.name;
+    $("#loginPwd").focus();
+    syncLoginBtn();
+  });
+}
+function syncLoginBtn() {
+  $("#loginBtn").disabled = !$("#newName").value.trim() || $("#loginPwd").value.length < 4;
 }
 async function login(name) {
-  const d = await post("/api/login", { name });
+  const pwd = ($("#loginPwd").value || "").trim();
+  if (pwd.length < 4) { toast("密码至少 4 位"); return; }
+  let d;
+  try {
+    d = await post("/api/login", { name, password: pwd, code: ($("#loginCode").value || "").trim() });
+  } catch (e) { toast(e.message || "登录失败"); return; }
   if (!d.ok) { toast(d.error || "登录失败"); return; }
+  $("#loginPwd").value = "";
   await enterApp();
 }
 $("#loginBtn").onclick = () => login($("#newName").value.trim());
-$("#newName").oninput = (e) => { $("#loginBtn").disabled = !e.target.value.trim(); };
+["#newName", "#loginPwd"].forEach(s => {
+  const el = $(s); if (el) el.oninput = syncLoginBtn;
+});
 
 async function enterApp() {
   me = (await api("/api/me")).user;
@@ -1777,4 +1803,267 @@ function openPrivChange() {
       renderSpace();
     } catch (e) { toast(e.message); }
   };
+}
+
+// =====================================================================
+// 真题模考 + 解答题训练
+// =====================================================================
+let exam = {
+  mode: "packs",        // packs | free
+  packs: [], subj: "全部", cur: null, qs: [], idx: 0,
+  answers: {}, self: {}, attr: {}, result: null, t0: 0,
+};
+let fr = { items: [], idx: 0, subj: "数学", realOnly: 0, score: 0, attr: "表述不规范", showAnswer: false };
+
+async function renderExam() {
+  const el = $("#tabExam");
+  if (!el) return;
+  if (exam.result) { renderExamReport(); return; }
+  if (exam.cur && exam.qs.length) { renderExamRun(); return; }
+  if (exam.mode === "free") { await renderFree(); return; }
+  await renderExamList();
+}
+
+function examModeBar(active) {
+  return '<div class="subj-filter">'
+    + '<button class="' + (active === "packs" ? "active" : "") + '" onclick="exam.mode=\'packs\'; exam.result=null; exam.cur=null; renderExam()">📄 真题套卷</button>'
+    + '<button class="' + (active === "free" ? "active" : "") + '" onclick="exam.mode=\'free\'; renderExam()">✍️ 解答题训练</button>'
+    + '</div>';
+}
+
+// ---------- 套卷列表 ----------
+async function renderExamList() {
+  const el = $("#tabExam");
+  el.innerHTML = examModeBar("packs") + '<div class="spinner"></div>';
+  let packs = [];
+  try { packs = (await api("/api/exam/packs")).packs || []; }
+  catch (e) { el.innerHTML = examModeBar("packs") + '<div class="chart-card">加载失败：' + esc(e.message) + '</div>'; return; }
+  exam.packs = packs;
+  if (!packs.length) {
+    el.innerHTML = examModeBar("packs") + '<div class="chart-card">'
+      + '<div class="cc-title">还没有真题</div>'
+      + '<div style="font-size:13px;color:#888;line-height:1.7">'
+      + '真题需要人工录入（带年份、卷别、出处）。把题目写进 <code>core/exam_bank/real_&lt;科目&gt;.py</code>，'
+      + '再执行 <code>python tools/import_exam.py</code> 即可入库。<br>先去「解答题训练」练主观题也可以。'
+      + '</div></div>';
+    return;
+  }
+  const subjects = ["全部"].concat([...new Set(packs.map(p => p.subject))]);
+  const list = packs.filter(p => exam.subj === "全部" || p.subject === exam.subj);
+  el.innerHTML = examModeBar("packs")
+    + '<div class="subj-filter">' + subjects.map(s =>
+      '<button class="' + (exam.subj === s ? "active" : "") + '" onclick="exam.subj=\'' + esc(s) + '\'; renderExam()">' + esc(s) + '</button>').join("") + '</div>'
+    + list.map((p, i) => '<div class="lesson-card">'
+      + '<div class="lc-main">'
+      + '<div class="lc-name">' + esc(p.subject) + ' · ' + esc(p.label)
+      + (p.warn ? ' <span class="warn-badge">⚠️ 待核对（已核 ' + (p.verified_n || 0) + '/' + p.n + '）</span>'
+                : ' <span class="ok-badge">✅ 已核对</span>') + '</div>'
+      + '<div class="lc-sub">共 ' + p.n + ' 题（选 ' + (p.n_choice || 0) + ' / 填 ' + (p.n_fill || 0)
+      + ' / 解 ' + ((p.n_solve || 0) + (p.n_exp || 0)) + ' / 其他 ' + ((p.n_essay || 0) + (p.n_dict || 0))
+      + '）· 建议 ' + p.duration + ' 分钟</div>'
+      + '</div><button class="lc-go" data-i="' + i + '">开考</button></div>').join("")
+    + '<div class="chart-card" id="examRecords"><div class="cc-title">最近成绩</div><div class="spinner"></div></div>';
+  el.querySelectorAll(".lc-go").forEach(b => b.onclick = () => startExam(list[+b.dataset.i]));
+  loadExamRecords();
+}
+
+async function loadExamRecords() {
+  const box = $("#examRecords"); if (!box) return;
+  try {
+    const items = (await api("/api/exam/records")).items || [];
+    box.innerHTML = '<div class="cc-title">最近成绩</div>' + (items.length
+      ? items.map(r => '<div style="font-size:13px;padding:4px 0;border-bottom:1px solid #f0f1f5">'
+        + esc(r.subject || "全科") + ' · ' + esc(String(r.score)) + '/' + esc(String(r.full_mark))
+        + '<span style="color:#888">· ' + esc((r.taken_at || "").slice(0, 10))
+        + (r.duration_min ? ' · ' + r.duration_min + '分钟' : '') + '</span></div>').join("")
+      : '<div style="font-size:13px;color:#888">还没有模考记录。先做一套真题，才知道真实水平。</div>');
+  } catch (e) { box.innerHTML = '<div class="cc-title">最近成绩</div>'; }
+}
+
+async function startExam(p) {
+  let d;
+  try { d = await post("/api/exam/start", { subject: p.subject, year: p.year, paper: p.paper }); }
+  catch (e) { toast(e.message || "开考失败"); return; }
+  exam.cur = p; exam.qs = d.questions || []; exam.idx = 0;
+  exam.answers = {}; exam.self = {}; exam.attr = {}; exam.result = null;
+  exam.t0 = Date.now();
+  renderExamRun();
+}
+
+// ---------- 答题 ----------
+function renderExamRun() {
+  const el = $("#tabExam");
+  const p = exam.cur, q = exam.qs[exam.idx], n = exam.qs.length;
+  const used = Math.round((Date.now() - exam.t0) / 60000);
+  let body = "";
+  if (q.qtype === "选择题") {
+    body = (q.options || []).map(o => {
+      const letter = (o.split(/[.、)）:：]/)[0] || "").trim();
+      const on = exam.answers[q.qid] === letter;
+      return '<button class="btn ' + (on ? "primary" : "") + '" style="text-align:left;margin-bottom:6px"'
+        + ' onclick="pickChoice(' + q.qid + ',\'' + esc(letter) + '\')">' + esc(o) + '</button>';
+    }).join("");
+  } else if (q.qtype === "填空题") {
+    body = '<input class="input" placeholder="答案（多空用；分隔）"'
+      + ' value="' + esc(exam.answers[q.qid] || "") + '"'
+      + ' oninput="exam.answers[' + q.qid + ']=this.value">';
+  } else {
+    const sc = exam.self[q.qid];
+    body = '<textarea class="input" style="min-height:150px" placeholder="在这里写下你的解答要点（本地保存，不上传判分）"'
+      + ' oninput="exam.answers[' + q.qid + ']=this.value">' + esc(exam.answers[q.qid] || "") + '</textarea>'
+      + '<div style="font-size:13px;color:#888;margin:10px 0 6px">对照采分点给自己打分：</div>'
+      + '<div class="btn-row">'
+      + [0, 0.5, 1].map(v => '<button class="btn ' + (sc === v ? "primary" : "ghost") + '"'
+        + ' onclick="setSelf(' + q.qid + ',' + v + ')">'
+        + (v === 0 ? "完全不会" : v === 0.5 ? "写对一半" : "基本写全") + '</button>').join("")
+      + '</div>';
+  }
+  el.innerHTML = '<div class="learn-top">'
+    + '<button class="back-btn" onclick="exam.cur=null; exam.qs=[]; renderExam()">← 退出</button>'
+    + '<div class="learn-title">' + esc(p.subject) + ' ' + esc(p.label) + '</div></div>'
+    + '<div class="chart-card">'
+    + '<div class="cc-title">第 ' + (exam.idx + 1) + '/' + n + ' 题 · ' + esc(q.qtype)
+    + (q.question_no ? ' · 原卷 ' + esc(q.question_no) : '')
+    + ' · 已用 ' + used + '/' + (p.duration || 75) + ' 分钟</div>'
+    + (q.verified ? '' : '<div class="exam-meta"><span class="warn-badge">⚠️ 待核对 · 答案以出处为准</span>'
+        + (q.source_ref ? '<a class="src-link" href="' + esc(q.source_ref) + '" target="_blank" rel="noopener">查看出处</a>' : '') + '</div>')
+    + '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap">' + esc(q.stem) + '</div>'
+    + '<div style="margin-top:12px">' + body + '</div>'
+    + '<div class="btn-row" style="margin-top:14px">'
+    + '<button class="btn ghost" onclick="examIdx(-1)">上一题</button>'
+    + (exam.idx < n - 1
+      ? '<button class="btn primary" onclick="examIdx(1)">下一题</button>'
+      : '<button class="btn success" onclick="submitExam()">交卷</button>')
+    + '</div>'
+    + '<div style="margin-top:8px"><button class="btn danger" onclick="submitExam()">提前交卷</button></div>'
+    + '</div>';
+}
+function pickChoice(qid, letter) { exam.answers[qid] = letter; renderExamRun(); }
+function setSelf(qid, v) { exam.self[qid] = v; renderExamRun(); }
+function examIdx(d) {
+  const n = exam.qs.length;
+  exam.idx = Math.max(0, Math.min(n - 1, exam.idx + d));
+  renderExamRun();
+}
+
+async function submitExam() {
+  if (!exam.qs.length) return;
+  const unanswered = exam.qs.filter(q => !exam.answers[q.qid] && exam.self[q.qid] === undefined).length;
+  if (unanswered && !confirm('还有 ' + unanswered + ' 题未作答，确定交卷？')) return;
+  const payload = {
+    subject: exam.cur.subject, year: exam.cur.year, paper: exam.cur.paper,
+    qids: exam.qs.map(q => q.qid), answers: exam.answers, self: exam.self, attr: exam.attr,
+    seconds: Math.round((Date.now() - exam.t0) / 1000),
+  };
+  try { exam.result = await post("/api/exam/submit", payload); }
+  catch (e) { toast(e.message || "交卷失败"); return; }
+  renderExamReport();
+}
+
+// ---------- 成绩报告 ----------
+function renderExamReport() {
+  const el = $("#tabExam"), r = exam.result, p = exam.cur;
+  const attrs = ["概念不清", "方法未掌握", "计算失误", "审题偏差", "时间不够", "表述不规范"];
+  el.innerHTML = '<div class="learn-top">'
+    + '<button class="back-btn" onclick="exam.result=null; exam.cur=null; exam.qs=[]; renderExam()">← 返回</button>'
+    + '<div class="learn-title">' + esc(p.subject) + ' ' + esc(p.label) + ' 成绩</div></div>'
+    + '<div class="chart-card">'
+    + '<div class="cc-title">得分 ' + r.score + ' / 100'
+    + (r.full_mark !== 100 ? '（折合卷面 ' + r.converted + ' / ' + r.full_mark + '）' : '') + '</div>'
+    + '<div style="font-size:13px;color:#666">答对 ' + r.correct + ' / ' + r.total
+    + ' 题。答错的主观题记得选归因，它会进错题本和复习队列。</div></div>'
+    + r.details.map(d => '<div class="chart-card">'
+      + '<div class="cc-title">' + esc(d.qtype) + (d.question_no ? ' ' + esc(d.question_no) : '')
+      + ' · 得分 ' + (d.score === 1 ? "✅ 满分" : d.score > 0 ? "⚠️ 半对" : "❌ 零分") + '</div>'
+      + (d.verified ? '' : '<div class="exam-meta"><span class="warn-badge">⚠️ 待核对</span>'
+        + (d.source_ref ? '<a class="src-link" href="' + esc(d.source_ref) + '" target="_blank" rel="noopener">出处</a>' : '') + '</div>')
+      + '<div style="font-size:14px;line-height:1.7;white-space:pre-wrap">' + esc(d.stem) + '</div>'
+      + ((d.options || []).length ? '<div style="font-size:13px;color:#666;margin-top:6px">' + d.options.map(esc).join("　") + '</div>' : "")
+      + (d.your ? '<div style="font-size:13px;margin-top:6px">你的答案：<b>' + esc(d.your) + '</b></div>' : "")
+      + '<div class="fb-answer">参考答案：' + esc(d.answer)
+      + (d.analysis ? '<br>解析：' + esc(d.analysis) : '') + '</div>'
+      + ((d.points || []).length ? '<div style="font-size:13px;line-height:1.7"><b>采分点</b><br>' + d.points.map(esc).join("<br>") + '</div>' : "")
+      + (d.score < 1 ? '<select class="attr-select" data-qid="' + d.qid + '">'
+        + '<option value="">选个归因（答错原因）</option>'
+        + attrs.map(a => '<option value="' + a + '"' + (exam.attr[d.qid] === a ? " selected" : "") + '>' + a + '</option>').join("")
+        + '</select>' : "")
+      + '</div>').join("")
+    + '<div class="btn-row" style="margin:12px 0 24px">'
+    + '<button class="btn ghost" onclick="saveExamAttr()">保存归因</button>'
+    + '<button class="btn primary" onclick="startExam(exam.cur)">再做一次</button></div>';
+}
+async function saveExamAttr() {
+  $$("#tabExam .attr-select").forEach(s => {
+    if (s.value) exam.attr[s.dataset.qid] = s.value;
+  });
+  try {
+    for (const qid of Object.keys(exam.attr)) {
+      await post("/api/wrong_attr", { qid: +qid, attribution: exam.attr[qid] });
+    }
+    toast("归因已保存");
+  } catch (e) { toast("保存失败"); }
+}
+
+// ---------- 解答题训练 ----------
+async function renderFree() {
+  const el = $("#tabExam");
+  const q = fr.items[fr.idx];
+  if (!q) {
+    el.innerHTML = examModeBar("free") + '<div class="spinner"></div>';
+    try {
+      const d = await api('/api/free_response?subject=' + encodeURIComponent(fr.subj) + '&n=6&real=' + fr.realOnly);
+      fr.items = d.items || []; fr.idx = 0; fr.showAnswer = false; fr.score = 0;
+    } catch (e) {
+      el.innerHTML = examModeBar("free") + '<div class="chart-card">加载失败：' + esc(e.message) + '</div>';
+      return;
+    }
+    if (!fr.items.length) {
+      el.innerHTML = examModeBar("free") + '<div class="chart-card"><div class="cc-title">该科目暂无解答题</div>'
+        + '<div style="font-size:13px;color:#888">换个科目试试，或先把真题/解答题导入题库。</div></div>';
+      return;
+    }
+    return renderFree();
+  }
+  const attrs = ["概念不清", "方法未掌握", "计算失误", "审题偏差", "时间不够", "表述不规范"];
+  const tag = q.source_type === "真题" && q.year ? q.year + '·' + (q.paper || "") : q.source_type;
+  el.innerHTML = examModeBar("free")
+    + '<div class="subj-filter">' + SUBJECTS.map(s =>
+      '<button class="' + (fr.subj === s ? "active" : "") + '" onclick="fr.subj=\'' + s + '\'; fr.items=[]; fr.idx=0; renderExam()">' + s + '</button>').join("")
+      + '<button class="' + (fr.realOnly ? "active" : "") + '" onclick="fr.realOnly=fr.realOnly?0:1; fr.items=[]; fr.idx=0; renderExam()">只看真题</button></div>'
+    + '<div class="chart-card">'
+    + '<div class="cc-title">' + esc(q.subject) + ' · ' + esc(q.qtype) + ' · ' + esc(tag)
+    + ' · 难度 ' + q.difficulty + ' · ' + (fr.idx + 1) + '/' + fr.items.length + '</div>'
+    + (q.source_type === "真题" && !q.verified ? '<div class="exam-meta"><span class="warn-badge">⚠️ 待核对</span>'
+        + (q.source_ref ? '<a class="src-link" href="' + esc(q.source_ref) + '" target="_blank" rel="noopener">出处</a>' : '') + '</div>' : '')
+    + '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap">' + esc(q.stem) + '</div>'
+    + '<textarea class="input" style="min-height:140px;margin-top:10px" placeholder="先在纸上写完，再回来对照采分点自评"></textarea>'
+    + (fr.showAnswer
+      ? '<div class="fb-answer"><b>参考答案</b><br>' + esc(q.answer)
+        + (q.analysis ? '<br><br>' + esc(q.analysis) : '') + '</div>'
+        + ((q.points || []).length ? '<div style="font-size:13px;line-height:1.8;margin:8px 0"><b>采分点</b><br>' + q.points.map(esc).join("<br>") + '</div>' : "")
+      : '<div class="btn-row"><button class="btn ghost" onclick="fr.showAnswer=true; renderExam()">👀 看答案与采分点</button></div>')
+    + '<div style="font-size:13px;color:#888;margin:10px 0 6px">自评：</div>'
+    + '<div class="btn-row">'
+    + [0, 0.5, 1].map(v => '<button class="btn ' + (fr.score === v ? "primary" : "ghost") + '" onclick="fr.score=' + v + '; renderExam()">'
+      + (v === 0 ? "没思路" : v === 0.5 ? "写对一半" : "基本写全") + '</button>').join("")
+    + '</div>'
+    + '<select class="attr-select" id="frAttr">'
+    + attrs.map(a => '<option value="' + a + '"' + (fr.attr === a ? " selected" : "") + '>' + a + '</option>').join("")
+    + '</select>'
+    + '<div class="btn-row">'
+    + '<button class="btn ghost" onclick="fr.idx=Math.min(fr.items.length-1, fr.idx+1); fr.showAnswer=false; fr.score=0; renderExam()">换一题</button>'
+    + '<button class="btn primary" onclick="submitFree()">提交并记入错题</button></div>'
+    + '</div>';
+}
+async function submitFree() {
+  const q = fr.items[fr.idx]; if (!q) return;
+  const node = $("#frAttr");
+  const attr = (node && node.value) || "表述不规范";
+  try {
+    await post("/api/free_response/submit", { qid: q.qid, score: fr.score, attribution: attr });
+    toast(fr.score >= 0.5 ? "已记录，继续保持" : "已进错题本，明天会再来找你");
+    fr.idx = Math.min(fr.items.length - 1, fr.idx + 1);
+    fr.showAnswer = false; fr.score = 0;
+    renderExam();
+  } catch (e) { toast(e.message || "提交失败"); }
 }

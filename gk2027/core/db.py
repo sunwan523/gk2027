@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS questions (
     options      TEXT DEFAULT '[]',
     answer       TEXT NOT NULL,
     analysis     TEXT DEFAULT '',
+    points       TEXT DEFAULT '',       -- 解答题采分点（JSON 数组），自评对照用
     image_path   TEXT,
     created_at   TEXT NOT NULL DEFAULT (datetime('now','localtime'))
 );
@@ -228,18 +229,39 @@ def _render_schema() -> str:
     return SCHEMA.format(sources=src, with_year=wy, attrs=at)
 
 
+def _migrate(conn: sqlite3.Connection) -> None:
+    """给已存在的老库补新列（CREATE TABLE IF NOT EXISTS 不会加列）。"""
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(questions)")}
+    if "points" not in cols:
+        conn.execute("ALTER TABLE questions ADD COLUMN points TEXT DEFAULT ''")
+        conn.commit()
+
+
 def init_db(path: str | None = None, *, seed: bool = False) -> sqlite3.Connection:
     """建表并返回连接。seed=True 时首次自动灌入知识图谱与自检题库
     （多用户模式下每个新库都需要种子数据）。"""
     conn = connect(path)
     conn.executescript(_render_schema())
     conn.commit()
+    _migrate(conn)
     from core import diary
     diary.create_tables(conn)   # 📖 空间：签到/随手记/体重/用户设置/隐秘空间
     if seed:
         from core import graph, seed_quiz
         graph.seed_graph(conn)
         seed_quiz.seed_self_quiz(conn)
+        # 主题库（core/quizbank/，2600+ 题）此前只在手动执行 quiz_bank_import
+        # 时才入库，新用户建号会只剩 191 道自检题。这里一并灌入，幂等。
+        try:
+            from core import quiz_bank_import
+            quiz_bank_import.import_to_conn(conn, quiz_bank_import.load_all_banks())
+        except Exception as e:
+            print("[db] 主题库灌入失败：%s" % e)
+        try:
+            from core import exam_bank
+            exam_bank.import_to(conn)      # 真题（幂等，重复题干自动跳过）
+        except Exception as e:
+            print("[db] 真题灌入失败：%s" % e)
         conn.commit()
     return conn
 
@@ -273,11 +295,12 @@ class DuplicateStem(Exception):
     """题干重复。旧项目 3003 条生物题只有 11 道不重复，此异常用于拦截注水。"""
 
 
-def add_question(conn: sqlite3.Connection, **kw: Any) -> int:
+def add_question(conn: sqlite3.Connection, *, _commit: bool = True, **kw: Any) -> int:
+    """录入一道题。_commit=False 时由调用方统一提交（批量导入用）。"""
     cols = [
         "source_type", "year", "paper", "question_no", "source_ref", "verified",
         "subject", "kp_id", "difficulty", "qtype", "stem", "options",
-        "answer", "analysis", "image_path",
+        "answer", "analysis", "points", "image_path",
     ]
     stem = (kw.get("stem") or "").strip()
     if not stem:
@@ -285,6 +308,8 @@ def add_question(conn: sqlite3.Connection, **kw: Any) -> int:
     kw["stem"] = stem
     if isinstance(kw.get("options"), (list, tuple)):
         kw["options"] = json.dumps(list(kw["options"]), ensure_ascii=False)
+    if isinstance(kw.get("points"), (list, tuple)):
+        kw["points"] = json.dumps(list(kw["points"]), ensure_ascii=False)
     kw.setdefault("options", "[]")
     kw.setdefault("verified", 0)
     kw.setdefault("difficulty", 3)
@@ -298,23 +323,32 @@ def add_question(conn: sqlite3.Connection, **kw: Any) -> int:
     sql = "INSERT INTO questions(%s) VALUES(%s)" % (
         ",".join(fields), ",".join("?" * len(fields)))
     cur = conn.execute(sql, [kw[c] for c in fields])
-    conn.commit()
+    if _commit:
+        conn.commit()
     return int(cur.lastrowid)
 
 
-def add_questions(conn: sqlite3.Connection, rows: Iterable[dict]) -> dict[str, int]:
-    """批量录入，返回统计。重复题干跳过而不中断，便于教辅批量导入。"""
+def add_questions(conn: sqlite3.Connection, rows: Iterable[dict],
+                  *, batch: bool = True) -> dict[str, int]:
+    """批量录入，返回统计。重复题干跳过而不中断，便于教辅批量导入。
+
+    batch=True（默认）时只在最后 commit 一次：逐条提交在 2600 题规模的
+    主题库上要两分钟，批量提交降到秒级（新用户建库要灌三份题库）。
+    """
     ok = dup = err = 0
-    for r in rows:
-        try:
-            add_question(conn, **r)
-            ok += 1
-        except DuplicateStem:
-            dup += 1
-        except sqlite3.IntegrityError:
-            dup += 1
-        except Exception:
-            err += 1
+    try:
+        for r in rows:
+            try:
+                add_question(conn, _commit=not batch, **r)
+                ok += 1
+            except DuplicateStem:
+                dup += 1
+            except sqlite3.IntegrityError:
+                dup += 1
+            except Exception:
+                err += 1
+    finally:
+        conn.commit()
     return {"inserted": ok, "duplicate": dup, "error": err}
 
 

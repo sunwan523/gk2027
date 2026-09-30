@@ -22,7 +22,7 @@ from fastapi import FastAPI, Request, Response
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import SUBJECTS, ATTRIBUTIONS
+from config import SUBJECTS, ATTRIBUTIONS, EXAM_DURATION, EXAM_FULL_MARK
 from core import db, graph, queue, content, users, ai_quiz, study_advisor, recite_lib
 
 try:
@@ -43,7 +43,8 @@ MAX_AGE = 365 * 24 * 3600
 
 
 def _user_from(req: Request):
-    uid = req.cookies.get(COOKIE)
+    """从签名 cookie 还原用户。uid 可预测，所以只认带正确签名的 token。"""
+    uid = users.verify_token(req.cookies.get(COOKIE, ""))
     if not uid:
         return None
     for u in users.list_users():
@@ -160,12 +161,13 @@ async def api_login(req: Request, res: Response):
     if not name:
         return JSONResponse({"ok": False, "error": "名字不能为空"}, status_code=400)
     try:
-        u = users.ensure_user(name)
+        u = users.login(name, body.get("password", ""), body.get("code", ""))
     except ValueError as e:
-        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=401)
     # 首次使用灌入知识图谱与题库种子（幂等）
     db.init_db(users.db_path(u["id"]), seed=True)
-    res.set_cookie(COOKIE, u["id"], max_age=MAX_AGE, httponly=True, samesite="lax")
+    res.set_cookie(COOKIE, users.make_token(u["id"]),
+                   max_age=MAX_AGE, httponly=True, samesite="lax")
     return {"ok": True, "user": {"id": u["id"], "name": u["name"]}}
 
 
@@ -176,8 +178,39 @@ def api_logout(res: Response):
 
 
 @app.get("/api/users")
-def api_users():
+async def api_users(req: Request):
+    """登录后才能看到账号列表（避免公网匿名枚举 uid + 姓名）。"""
+    if not _user_from(req):
+        return JSONResponse({"error": "未登录"}, status_code=401)
     return {"users": [{"id": u["id"], "name": u["name"]} for u in users.list_users()]}
+
+
+@app.post("/api/password")
+async def api_password(req: Request):
+    """修改密码。忘记密码时用 access code 重置（old_pwd 留空 + 传 code）。"""
+    body = await req.json() or {}
+    new_pwd = (body.get("new_pwd") or "").strip()
+    name = (body.get("name") or "").strip()
+    code = (body.get("code") or "").strip()
+    try:
+        if name and code:                       # 自助重置
+            if users.ACCESS_CODE and code != users.ACCESS_CODE:
+                return JSONResponse({"ok": False, "error": "准入码不正确"}, status_code=403)
+            users.set_password(name, new_pwd)
+        else:                                   # 已登录改密
+            u = _user_from(req)
+            if not u:
+                return JSONResponse({"error": "未登录"}, status_code=401)
+            users.change_password(u["id"], body.get("old_pwd", ""), new_pwd)
+    except ValueError as e:
+        return JSONResponse({"ok": False, "error": str(e)}, status_code=400)
+    return {"ok": True}
+
+
+@app.get("/api/auth_mode")
+def api_auth_mode():
+    """告诉前端是否需要准入码，登录页据此显示对应输入框。"""
+    return {"need_code": bool(users.ACCESS_CODE)}
 
 
 # ----------------------------------------------------------------------
@@ -481,6 +514,195 @@ async def api_ai_advice(req: Request):
         return {"advice": advice}
     except Exception as e:
         return JSONResponse({"error": "AI建议生成失败：%s" % str(e)[:200]}, status_code=500)
+
+
+# ----------------------------------------------------------------------
+# 真题模考：选卷 → 限时作答 → 交卷判分 → 归因进错题本
+# ----------------------------------------------------------------------
+@app.get("/api/exam/packs")
+async def api_exam_packs(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    from core import exam_bank
+    packs = exam_bank.stats(c)
+    for p in packs:
+        p["duration"] = EXAM_DURATION.get(p["subject"], 75)
+        p["label"] = "%d·%s" % (p["year"], p["paper"])
+        # verified=0 表示还没跟原始卷子逐字核对过，前端要显式标注，
+        # 免得把待校对的题当成标准答案背。
+        p["verified_n"] = int(p.get("n_verified") or 0)
+        p["warn"] = "" if p.get("all_verified") else "待核对"
+    return {"packs": packs}
+
+
+@app.get("/api/exam/records")
+async def api_exam_records(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    rows = c.execute(
+        "SELECT id, taken_at, kind, subject, score, full_mark, duration_min, raw_score "
+        "FROM exam_records ORDER BY id DESC LIMIT 30").fetchall()
+    return {"items": [dict(r) for r in rows]}
+
+
+@app.post("/api/exam/start")
+async def api_exam_start(req: Request):
+    """开考：返回题目（隐藏答案与解析，交卷后统一给出）。"""
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    subj, year, paper = body.get("subject"), body.get("year"), body.get("paper")
+    if not (subj and year and paper):
+        return JSONResponse({"error": "缺少 subject/year/paper"}, status_code=400)
+    rows = c.execute(
+        "SELECT * FROM questions WHERE source_type='真题' AND subject=? AND year=? AND paper=? "
+        "ORDER BY CASE qtype WHEN '选择题' THEN 0 WHEN '填空题' THEN 1 ELSE 2 END, question_no, id",
+        (subj, int(year), paper)).fetchall()
+    if not rows:
+        return JSONResponse({"error": "这套卷子还没有题目"}, status_code=404)
+    qs = [{
+        "qid": r["id"], "qtype": r["qtype"], "stem": r["stem"],
+        "options": db.decode_options(r), "question_no": r["question_no"],
+        "difficulty": r["difficulty"], "kp_id": r["kp_id"],
+        "has_points": bool(r["points"]), "verified": int(r["verified"] or 0),
+        "source_ref": r["source_ref"] or "",
+    } for r in rows]
+    return {"subject": subj, "year": int(year), "paper": paper,
+            "duration": EXAM_DURATION.get(subj, 75), "questions": qs}
+
+
+@app.post("/api/exam/submit")
+async def api_exam_submit(req: Request):
+    """交卷：选择/填空自动判，解答题按自评（0 / 0.5 / 1）给分。
+
+    得分 = 各题得分 / 题数 × 100（卷内分值权重暂未建模，先按题数等比）。
+    """
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    qids = body.get("qids") or []
+    answers = body.get("answers") or {}
+    selfscore = body.get("self") or {}
+    seconds = int(body.get("seconds", 0) or 0)
+    subj = body.get("subject") or ""
+    if not qids:
+        return JSONResponse({"error": "没有题目"}, status_code=400)
+
+    details, got, total = [], 0.0, 0
+    for qid in qids:
+        qid = int(qid)
+        r = c.execute("SELECT * FROM questions WHERE id=?", (qid,)).fetchone()
+        if not r:
+            continue
+        total += 1
+        val = str(answers.get(str(qid), answers.get(qid, "")) or "")
+        if r["qtype"] == "选择题":
+            ok = queue.grade_choice(val, r["answer"])
+            score = 1.0 if ok else 0.0
+        elif r["qtype"] == "填空题":
+            ok = queue.grade_fill(val, r["answer"])
+            score = 1.0 if ok else 0.0
+        else:
+            score = float(selfscore.get(str(qid), selfscore.get(qid, 0)) or 0)
+            score = 0.0 if score < 0 else (1.0 if score > 1 else score)
+            ok = score >= 0.5
+        got += score
+        # 归因要在入库那一刻就传进去：错题卡片的标题会带上归因，
+        # 事后用 set_wrong_attribution 改只会改错题本，卡片标题还是旧的。
+        attr = (body.get("attr") or {}).get(str(qid), "") or "概念不清"
+        queue.submit_answer(c, qid, ok, kp_id=r["kp_id"], attribution=attr)
+        details.append({
+            "qid": qid, "qtype": r["qtype"], "stem": r["stem"],
+            "options": db.decode_options(r), "your": val,
+        "answer": r["answer"], "analysis": r["analysis"],
+        "points": json_points(r["points"]), "score": score,
+        "question_no": r["question_no"], "kp_id": r["kp_id"],
+        "verified": int(r["verified"] or 0), "source_ref": r["source_ref"] or "",
+    })
+    if not total:
+        return JSONResponse({"error": "题目不存在"}, status_code=400)
+
+    pct = round(got / total * 100, 1)
+    full = EXAM_FULL_MARK.get(subj, 100)
+    c.execute(
+        "INSERT INTO exam_records(kind, subject, score, full_mark, duration_min, raw_score, detail)"
+        " VALUES(?,?,?,?,?,?,?)",
+        ("单科实测", subj, round(pct / 100 * full, 1), full,
+         max(1, round(seconds / 60)), pct,
+         "%d/%d 题" % (round(got), total)))
+    c.commit()
+    queue.add_xp(c, int(got * 5))
+    return {"score": pct, "full_mark": full,
+            "converted": round(pct / 100 * full, 1),
+            "correct": round(got), "total": total, "details": details}
+
+
+def json_points(raw: str | None) -> list[str]:
+    import json as _json
+    try:
+        v = _json.loads(raw or "[]")
+        return v if isinstance(v, list) else []
+    except (ValueError, TypeError):
+        return []
+
+
+# ----------------------------------------------------------------------
+# 解答题训练：按科目/知识点取主观题，写完对照采分点自评
+# ----------------------------------------------------------------------
+FREE_TYPES = ("解答题", "实验题", "作文")
+
+
+@app.get("/api/free_response")
+async def api_free_response(req: Request, subject: str = "", kp_id: str = "",
+                            n: int = 6, real: int = 0):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    n = max(1, min(20, int(n)))
+    sql = "SELECT * FROM questions WHERE qtype IN ('解答题','实验题','作文')"
+    args: list = []
+    if subject:
+        sql += " AND subject=?"; args.append(subject)
+    if kp_id:
+        sql += " AND kp_id=?"; args.append(kp_id)
+    if real:
+        sql += " AND source_type='真题'"
+    # 优先没做过的，再做正确率低的
+    sql += (" ORDER BY (SELECT COUNT(*) FROM attempts a WHERE a.question_id=questions.id),"
+            " difficulty DESC, id LIMIT ?")
+    args.append(n)
+    rows = c.execute(sql, args).fetchall()
+    return {"items": [{
+        "qid": r["id"], "subject": r["subject"], "kp_id": r["kp_id"],
+        "qtype": r["qtype"], "stem": r["stem"], "difficulty": r["difficulty"],
+        "source_type": r["source_type"],
+        "verified": int(r["verified"] or 0), "source_ref": r["source_ref"] or "",
+        "year": r["year"], "paper": r["paper"], "question_no": r["question_no"],
+        "answer": r["answer"], "analysis": r["analysis"],
+        "points": json_points(r["points"]),
+    } for r in rows]}
+
+
+@app.post("/api/free_response/submit")
+async def api_free_submit(req: Request):
+    """自评提交：score ∈ {0, 0.5, 1}，答错必须归因（写进错题本与 SRS）。"""
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    qid = int(body.get("qid", 0))
+    score = float(body.get("score", 0) or 0)
+    score = 0.0 if score < 0 else (1.0 if score > 1 else score)
+    attr = body.get("attribution", "") or "表述不规范"
+    r = c.execute("SELECT kp_id FROM questions WHERE id=?", (qid,)).fetchone()
+    if not r:
+        return JSONResponse({"error": "题目不存在"}, status_code=404)
+    queue.submit_answer(c, qid, score >= 0.5, kp_id=r["kp_id"], attribution=attr)
+    return {"ok": True, "score": score}
 
 
 # ----------------------------------------------------------------------

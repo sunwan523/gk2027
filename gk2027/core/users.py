@@ -11,7 +11,9 @@
 """
 from __future__ import annotations
 
+import base64
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -22,6 +24,33 @@ from config import DATA_DIR
 USERS_DIR = os.path.join(DATA_DIR, "users")
 REGISTRY = os.path.join(DATA_DIR, "users.json")
 os.makedirs(USERS_DIR, exist_ok=True)
+
+# 家庭准入码（可选）。设置后，任何建号/登录都必须同时提供正确的准入码，
+# 相当于给公网部署再加一道门。容器里用环境变量 GK_ACCESS_CODE 注入。
+ACCESS_CODE = os.environ.get("GK_ACCESS_CODE", "")
+
+_PBKDF2_ITER = 200_000
+MIN_PWD_LEN = 4
+
+
+# ---------------------------------------------------------------- 口令
+def _hash_pwd(pwd: str, salt: bytes) -> str:
+    dk = hashlib.pbkdf2_hmac("sha256", pwd.encode("utf-8"), salt, _PBKDF2_ITER)
+    return "pbkdf2$%d$%s$%s" % (
+        _PBKDF2_ITER,
+        base64.b64encode(salt).decode(),
+        base64.b64encode(dk).decode(),
+    )
+
+
+def _verify_pwd(pwd: str, stored: str) -> bool:
+    try:
+        _, it, salt, want = stored.split("$")
+    except (ValueError, AttributeError):
+        return False
+    dk = hashlib.pbkdf2_hmac("sha256", str(pwd).encode("utf-8"),
+                             base64.b64decode(salt), int(it))
+    return hmac.compare_digest(base64.b64encode(dk).decode(), want)
 
 
 # ---------------------------------------------------------------- registry
@@ -53,7 +82,14 @@ def list_users() -> list[dict]:
     return _load()["users"]
 
 
-def add_user(name: str) -> dict:
+def _check_pwd(pwd: str) -> str:
+    pwd = (pwd or "").strip()
+    if len(pwd) < MIN_PWD_LEN:
+        raise ValueError("密码至少 %d 位" % MIN_PWD_LEN)
+    return pwd
+
+
+def add_user(name: str, password: str = "") -> dict:
     name = name.strip()
     if not name:
         raise ValueError("名字不能为空")
@@ -62,11 +98,98 @@ def add_user(name: str) -> dict:
     reg = _load()
     if any(u["name"] == name for u in reg["users"]):
         raise ValueError("已存在同名用户：%s" % name)
-    u = {"id": _uid(name), "name": name, "created": date.today().isoformat()}
+    u = {"id": _uid(name), "name": name, "created": date.today().isoformat(),
+         "pwd": _hash_pwd(_check_pwd(password), os.urandom(16))}
     reg["users"].append(u)
     reg["current"] = u["id"]
     _save(reg)
     return u
+
+
+def set_password(name: str, password: str) -> None:
+    """直接重置口令（已过准入码校验后调用）。"""
+    reg = _load()
+    hit = False
+    for u in reg["users"]:
+        if u["name"] == name.strip():
+            u["pwd"] = _hash_pwd(_check_pwd(password), os.urandom(16))
+            hit = True
+    if not hit:
+        raise ValueError("用户不存在：%s" % name)
+    _save(reg)
+
+
+def login(name: str, password: str, code: str = "") -> dict:
+    """登录/建号入口：校验准入码 + 口令，成功返回 user。
+
+    历史账号（registry 里没有 pwd 字段）在通过准入码后，
+    用本次输入的口令完成初始化，之后正常校验。
+    """
+    if ACCESS_CODE and (code or "").strip() != ACCESS_CODE:
+        raise ValueError("准入码不正确")
+    u = find_by_name(name)
+    if u is None:
+        return add_user(name, password)
+    stored = u.get("pwd")
+    if stored:
+        if not _verify_pwd(password or "", stored):
+            raise ValueError("密码不正确")
+        return u
+    # 老账号首次登录：初始化口令
+    _check_pwd(password)
+    reg = _load()
+    for x in reg["users"]:
+        if x["name"] == u["name"]:
+            x["pwd"] = _hash_pwd(password, os.urandom(16))
+    _save(reg)
+    return find_by_name(name)
+
+
+# ---------------------------------------------------------------- 会话签名
+# uid 由名字 md5 前 8 位生成，是可预测的；因此 cookie 必须带服务端签名，
+# 否则任何人知道用户名就能伪造 gk_uid 读取他人数据。
+def _secret() -> bytes:
+    p = os.path.join(DATA_DIR, "session.secret")
+    try:
+        with open(p, "rb") as f:
+            s = f.read().strip()
+        if s:
+            return s
+    except OSError:
+        pass
+    s = os.urandom(32).hex().encode()
+    with open(p, "wb") as f:
+        f.write(s)
+    return s
+
+
+def sign(uid: str) -> str:
+    return hmac.new(_secret(), uid.encode("utf-8"), hashlib.sha256).hexdigest()[:32]
+
+
+def make_token(uid: str) -> str:
+    return "%s.%s" % (uid, sign(uid))
+
+
+def verify_token(token: str) -> str | None:
+    """校验 cookie 里的 token，通过返回 uid，否则 None。"""
+    if not token or "." not in token:
+        return None
+    uid, _, sig = token.rpartition(".")
+    if not uid or not hmac.compare_digest(sig, sign(uid)):
+        return None
+    return uid
+
+
+def change_password(uid: str, old_pwd: str, new_pwd: str) -> None:
+    reg = _load()
+    u = next((x for x in reg["users"] if x["id"] == uid), None)
+    if not u:
+        raise ValueError("用户不存在")
+    if u.get("pwd") and not _verify_pwd(old_pwd or "", u["pwd"]):
+        raise ValueError("原密码不正确")
+    u["pwd"] = _hash_pwd(_check_pwd(new_pwd), os.urandom(16))
+    _save(reg)
 
 
 def remove_user(uid: str) -> None:

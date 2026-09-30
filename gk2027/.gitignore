@@ -21,3 +21,9 @@ Thumbs.db
 
 # 本地依赖（容器用 requirements.txt 安装）
 _vendor/
+
+# 清理回收区（2026-09-24 大扫除：失效 .git 指针 / 一次性脚本 / 空壳仓库迁移于此，确认无影响后可删）
+_trash_*/
+
+# 其它 AI 工具工作目录（WorkBuddy：记忆/自动化任务/备份，含敏感信息，绝不入库）
+.workbuddy/

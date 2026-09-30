@@ -157,3 +157,27 @@ def foundation_days() -> int:
 SERVER_PORT = 8577
 # 外网访问地址（域名/端口映射），出门在外用这个访问；局域网用 _lan_ip() 自动获取
 PUBLIC_URL = "http://p.mhtc.top:8577"
+
+# --------------------------------------------------------------------------
+# DeepSeek API Key（绝不硬编码入库，2026-09-30 安全整改）
+# 优先级：环境变量 DEEPSEEK_API_KEY > data/deepseek.key 文件（部署机放密钥文件）
+# 线上部署：把 key 写入 88 挂载卷 /root/gk2027-data/deepseek.key（容器内即 /app/data/deepseek.key）
+# --------------------------------------------------------------------------
+def _read_deepseek_key() -> str:
+    k = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+    if k:
+        return k
+    try:
+        p = os.path.join(DATA_DIR, "deepseek.key")
+        if os.path.isfile(p):
+            # utf-8-sig 兼容 Windows 记事本/PowerShell 写入的 BOM
+            k = open(p, encoding="utf-8-sig").read().strip()
+            if k.startswith("sk-"):
+                return k
+    except Exception:
+        pass
+    return ""
+
+
+DEEPSEEK_API_KEY = _read_deepseek_key()
+

@@ -7,7 +7,9 @@ import re
 import urllib.request
 import urllib.error
 
-API_KEY = "sk-b975b7c022ca4815b3c8d75c1d89c3c7"
+from config import DEEPSEEK_API_KEY
+
+API_KEY = DEEPSEEK_API_KEY
 API_URL = "https://api.deepseek.com/v1/chat/completions"
 MODEL = "deepseek-chat"
 

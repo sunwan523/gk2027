@@ -16,8 +16,10 @@
     <div id="loginUsers"></div>
     <div class="login-divider">—— 或新同学 ——</div>
     <input id="newName" type="text" placeholder="名字（如：小明）" maxlength="12">
-    <button id="loginBtn" class="primary" disabled>✨ 开始使用</button>
-    <p class="tip">每个人的进度、错题、复习卡片独立保存，互不影响。</p>
+    <input id="loginPwd" type="password" placeholder="密码（新账号即设为初始密码）" maxlength="32">
+    <input id="loginCode" type="password" placeholder="准入码" maxlength="32" hidden>
+    <button id="loginBtn" class="primary" disabled>✨ 登录 / 开始使用</button>
+    <p class="tip">密码保护你的日记与学习数据。每个人的进度、错题、复习卡片独立保存，互不影响。</p>
   </div>
 </div>
 
@@ -26,6 +28,7 @@
   <div id="headerBar" class="header"></div>
 
   <div id="tabLearn" class="page tab-page"></div>
+  <div id="tabExam" class="page tab-page hidden"></div>
   <div id="tabReview" class="page tab-page hidden"></div>
   <div id="tabStats" class="page tab-page hidden"></div>
   <div id="tabRecite" class="page tab-page hidden"></div>
@@ -36,6 +39,7 @@
 
   <nav id="navBar" class="nav">
     <button data-tab="tabLearn" class="nav-btn active">📚 学习</button>
+    <button data-tab="tabExam" class="nav-btn">🎯 真题</button>
     <button data-tab="tabReview" class="nav-btn">🔁 复习</button>
     <button data-tab="tabMine" class="nav-btn">👤 我的</button>
   </nav>
