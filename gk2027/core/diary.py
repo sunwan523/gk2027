@@ -4,7 +4,8 @@ import base64, hashlib, io, json, os, re, uuid
 from datetime import datetime, timedelta
 
 from core import ai_quiz
-from core.ai_quiz import _chat, API_URL, API_KEY, MODEL  # noqa: F401（_chat 复用）
+from core.ai_quiz import _chat  # noqa: F401（_chat 复用；AI 配置在 _chat 内动态读取）
+from config import load_ai_config
 
 try:
     from cryptography.fernet import Fernet, InvalidToken
@@ -434,7 +435,7 @@ def organize(text: str) -> dict:
            "summary 给一句话摘要（不超过30字）；若对复习有帮助给一句简短建议 advice，否则空字符串。\n"
            "只输出JSON：{\"category\":\"\",\"summary\":\"\",\"advice\":\"\",\"text\":\"规范化后的完整正文\"}")
     payload = {
-        "model": MODEL,
+        "model": load_ai_config()["model"],
         "messages": [
             {"role": "system", "content": sys},
             {"role": "user", "content": (text or "")[:2000]},
