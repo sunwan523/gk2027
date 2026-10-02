@@ -160,12 +160,17 @@ PUBLIC_URL = "http://p.mhtc.top:8577"
 
 # --------------------------------------------------------------------------
 # AI 大模型（OpenAI 兼容接口，2026-10-02 起由 DeepSeek 切换为 agnes-ai）
-# 密钥绝不硬编码入库：环境变量 AI_API_KEY > data/ai.key 文件（部署机挂载卷）
-# 兼容旧文件 data/deepseek.key（若 ai.key 不存在则回退读取）
-# 线上部署：把 key 写入 88 挂载卷 /root/gk2027-data/ai.key（容器内即 /app/data/ai.key）
+# 优先级（运行时动态读取，设置页可改、改完立即生效、无需重启/部署）：
+#   1) data/ai_config.json —— 设置页"AI 模型设置"写入的运行时配置（挂载卷持久化）
+#   2) 环境变量 AI_API_BASE / AI_MODEL / AI_API_KEY
+#   3) 密钥文件 data/ai.key（兼容旧文件 data/deepseek.key）
+# 密钥绝不硬编码入库。线上部署：key 写 88 挂载卷 /root/gk2027-data/ai.key（容器内 /app/data/ai.key）
 # --------------------------------------------------------------------------
-AI_API_BASE = os.environ.get("AI_API_BASE", "https://apihub.agnes-ai.com/v1")
-AI_MODEL = os.environ.get("AI_MODEL", "agnes-2.5-flash")
+AI_API_BASE_DEFAULT = "https://apihub.agnes-ai.com/v1"
+AI_MODEL_DEFAULT = "agnes-2.5-flash"
+AI_CONFIG_FILE = os.path.join(DATA_DIR, "ai_config.json")
+AI_API_BASE = os.environ.get("AI_API_BASE", AI_API_BASE_DEFAULT)
+AI_MODEL = os.environ.get("AI_MODEL", AI_MODEL_DEFAULT)
 
 
 def _read_ai_key() -> str:
@@ -186,4 +191,60 @@ def _read_ai_key() -> str:
 
 
 AI_API_KEY = _read_ai_key()
+
+
+def load_ai_config() -> dict:
+    """读取当前生效的 AI 配置：ai_config.json > 环境变量 > 密钥文件。
+
+    返回 {"base": ..., "model": ..., "key": ...}；key 为空表示未配置。
+    """
+    import json
+    cfg: dict = {}
+    try:
+        if os.path.isfile(AI_CONFIG_FILE):
+            with open(AI_CONFIG_FILE, encoding="utf-8") as f:
+                cfg = json.load(f) or {}
+    except Exception:
+        cfg = {}
+    base = str(cfg.get("base") or "").strip()
+    model = str(cfg.get("model") or "").strip()
+    key = str(cfg.get("key") or "").strip()
+    if not base:
+        base = os.environ.get("AI_API_BASE", AI_API_BASE_DEFAULT)
+    if not model:
+        model = os.environ.get("AI_MODEL", AI_MODEL_DEFAULT)
+    if not key:
+        key = _read_ai_key()
+    return {"base": base, "model": model, "key": key}
+
+
+def save_ai_config(base: str, model: str, key: str = "") -> dict:
+    """保存运行时 AI 配置（设置页调用）。key 传空表示保留原 key 不覆盖。
+
+    写入 data/ai_config.json（与密钥文件同目录，随挂载卷持久化）。
+    """
+    import json
+    old: dict = {}
+    try:
+        if os.path.isfile(AI_CONFIG_FILE):
+            with open(AI_CONFIG_FILE, encoding="utf-8") as f:
+                old = json.load(f) or {}
+    except Exception:
+        pass
+    new = {
+        "base": (base or "").strip() or AI_API_BASE_DEFAULT,
+        "model": (model or "").strip() or AI_MODEL_DEFAULT,
+    }
+    k = (key or "").strip()
+    if k.startswith("sk-"):
+        new["key"] = k
+    elif old.get("key"):
+        new["key"] = old["key"]
+    else:
+        new["key"] = _read_ai_key()
+    tmp = AI_CONFIG_FILE + ".tmp"
+    with open(tmp, "w", encoding="utf-8") as f:
+        json.dump(new, f, ensure_ascii=False)
+    os.replace(tmp, AI_CONFIG_FILE)
+    return new
 

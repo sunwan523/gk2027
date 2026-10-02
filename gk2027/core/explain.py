@@ -7,11 +7,7 @@ import json
 import urllib.error
 import urllib.request
 
-from config import AI_API_KEY, AI_API_BASE, AI_MODEL
-
-API_KEY = AI_API_KEY
-API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
-MODEL = AI_MODEL
+from config import load_ai_config
 
 SYSTEM_PROMPT = """你是经验丰富的高中教师，最擅长把难懂的知识点用大白话讲明白。
 要求：
@@ -22,11 +18,12 @@ SYSTEM_PROMPT = """你是经验丰富的高中教师，最擅长把难懂的知�
 
 
 def explain_point(subject: str, kp_name: str, text: str) -> str:
-    """把一句没看懂的卡片内容讲明白。text 不超过 800 字。"""
+    """把一句没看懂的卡片内容讲明白。text 不超过 800 字。每次调用动态读取配置。"""
+    cfg = load_ai_config()
     user = f"科目：{subject}\n知识点：{kp_name}\n\n下面这句我没看懂，请讲明白：\n{text[:800]}"
 
     payload = {
-        "model": MODEL,
+        "model": cfg["model"],
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user},
@@ -36,11 +33,11 @@ def explain_point(subject: str, kp_name: str, text: str) -> str:
     }
 
     req = urllib.request.Request(
-        API_URL,
+        cfg["base"].rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
+            "Authorization": f"Bearer {cfg['key']}",
         },
         method="POST",
     )
@@ -50,7 +47,7 @@ def explain_point(subject: str, kp_name: str, text: str) -> str:
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"DeepSeek API错误 {e.code}: {err_body[:200]}")
+        raise RuntimeError(f"AI API错误 {e.code}: {err_body[:200]}")
     except Exception as e:
         raise RuntimeError(f"API调用失败: {e}")
 

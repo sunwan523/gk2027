@@ -988,6 +988,24 @@ async function renderSettings() {
       <div class="set-title">🔁 朗读自动翻页</div>
       <div class="set-opts"><button id="setAuto" class="switch">${ttsAuto ? "开" : "关"}</button></div>
     </div>
+    <div class="set-card">
+      <div class="set-title">🤖 AI 模型设置</div>
+      <div class="cap">全局生效 · 保存后立即生效，换 Key/模型/域名不用重新部署</div>
+      <div style="margin-top:10px;">
+        <div style="font-size:13px;color:#666;margin-bottom:4px;">API 地址</div>
+        <input id="aiBase" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;" placeholder="https://apihub.agnes-ai.com/v1">
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-size:13px;color:#666;margin-bottom:4px;">模型名</div>
+        <input id="aiModel" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;" placeholder="agnes-2.5-flash">
+      </div>
+      <div style="margin-top:10px;">
+        <div style="font-size:13px;color:#666;margin-bottom:4px;">API Key（留空表示不修改当前 Key）</div>
+        <input id="aiKey" type="password" style="width:100%;box-sizing:border-box;padding:10px;border:1px solid #ddd;border-radius:8px;font-size:14px;" placeholder="sk-…">
+      </div>
+      <div class="cap" id="aiKeyState" style="margin-top:6px;"></div>
+      <button class="btn" id="saveAiConfig" style="width:100%;margin-top:10px;padding:10px;">保存 AI 配置</button>
+    </div>
     <button class="btn primary" id="saveSettings" style="width:100%;margin-top:16px;padding:12px;">保存设置</button>
     <div class="cap" style="text-align:center;margin-top:10px;">保存后立即生效，学习页/背诵页共用</div>`;
   fillVoiceSel();
@@ -1003,6 +1021,31 @@ async function renderSettings() {
   mk("setFont", "f", tts.font);
   const sa = $("#setAuto");
   if (sa) sa.onclick = () => { ttsAuto = !ttsAuto; sa.textContent = ttsAuto ? "开" : "关"; sa.classList.toggle("on", ttsAuto); };
+  // AI 模型配置：加载当前值 + 保存（key 留空不修改）
+  (async () => {
+    try {
+      const ac = await api("/api/ai_config");
+      if (ac && ac.base) $("#aiBase").value = ac.base;
+      if (ac && ac.model) $("#aiModel").value = ac.model;
+      const ks = $("#aiKeyState");
+      if (ks) ks.textContent = ac.key_set ? "🔑 当前已设置密钥（输入框留空则不修改）" : "⚠️ 当前未设置密钥，请填写 API Key";
+    } catch (e) {}
+  })();
+  const sai = $("#saveAiConfig");
+  if (sai) sai.onclick = async () => {
+    const base = $("#aiBase").value.trim();
+    const model = $("#aiModel").value.trim();
+    const key = $("#aiKey").value.trim();
+    if (!base || !model) { toast("请填写 API 地址和模型名"); return; }
+    try {
+      const r = await post("/api/ai_config", { base, model, key });
+      if (r && r.ok) {
+        toast("AI 配置已保存，立即生效 ✓");
+        const ks = $("#aiKeyState");
+        if (ks) ks.textContent = r.key_set ? "🔑 当前已设置密钥" : "⚠️ 未设置密钥";
+      } else { toast("保存失败"); }
+    } catch (e) { toast("保存失败：" + (e.message || e)); }
+  };
   $("#saveSettings").onclick = async () => {
     const r = $("#setRate .on"); if (r) tts.rate = parseFloat(r.dataset.r);
     const f = $("#setFont .on"); if (f) tts.font = parseInt(f.dataset.f);

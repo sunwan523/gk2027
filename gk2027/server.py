@@ -23,6 +23,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import SUBJECTS, ATTRIBUTIONS, EXAM_DURATION, EXAM_FULL_MARK
+import config
 from core import db, graph, queue, content, users, ai_quiz, study_advisor, recite_lib
 
 try:
@@ -772,6 +773,33 @@ async def api_settings_post(req: Request):
         if k in body and body[k] is not None:
             db.set_setting(c, k, body[k])
     return {"ok": True}
+
+
+@app.get("/api/ai_config")
+async def api_ai_config_get(req: Request):
+    """返回当前生效的 AI 配置（key 只给是否已设置，不回显明文）。"""
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    cfg = config.load_ai_config()
+    return {"ok": True, "base": cfg["base"], "model": cfg["model"],
+            "key_set": bool(cfg["key"])}
+
+
+@app.post("/api/ai_config")
+async def api_ai_config_post(req: Request):
+    """保存 AI 运行时配置（设置页可改，改完立即生效，无需重启/部署）。
+    key 传空字符串表示保留原 key 不覆盖。"""
+    c, u = _conn_for(req)
+    if not c:
+        return {"ok": False}
+    body = await req.json() or {}
+    base = str(body.get("base") or "").strip()
+    model = str(body.get("model") or "").strip()
+    key = str(body.get("key") or "").strip()
+    new = config.save_ai_config(base, model, key)
+    return {"ok": True, "base": new["base"], "model": new["model"],
+            "key_set": bool(new.get("key"))}
 
 
 @app.get("/api/recite_progress")

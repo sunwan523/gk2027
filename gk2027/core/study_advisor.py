@@ -13,11 +13,7 @@ import urllib.request
 import urllib.error
 from datetime import date, timedelta
 
-from config import AI_API_KEY, AI_API_BASE, AI_MODEL
-
-API_KEY = AI_API_KEY
-API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
-MODEL = AI_MODEL
+from config import load_ai_config
 
 SYSTEM_PROMPT = """你是一位高考复习规划老师。用户会给你一份学习统计摘要（JSON），请基于数据给出可执行的学习建议。
 
@@ -124,9 +120,10 @@ def build_summary(conn: sqlite3.Connection) -> dict:
 
 
 def get_advice(summary: dict, timeout: int = 45) -> str:
-    """调用 DeepSeek 生成学习建议，返回 Markdown 文本。"""
+    """调用 AI 大模型生成学习建议，返回 Markdown 文本。每次调用动态读取配置。"""
+    cfg = load_ai_config()
     payload = {
-        "model": MODEL,
+        "model": cfg["model"],
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": "我的学习统计摘要（JSON）：\n"
@@ -136,10 +133,10 @@ def get_advice(summary: dict, timeout: int = 45) -> str:
         "max_tokens": 1200,
     }
     req = urllib.request.Request(
-        API_URL,
+        cfg["base"].rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={"Content-Type": "application/json",
-                 "Authorization": "Bearer " + API_KEY},
+                 "Authorization": "Bearer " + cfg["key"]},
         method="POST",
     )
     try:
@@ -147,7 +144,7 @@ def get_advice(summary: dict, timeout: int = 45) -> str:
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError("DeepSeek API错误 %d: %s" % (e.code, err_body[:200]))
+        raise RuntimeError("AI API错误 %d: %s" % (e.code, err_body[:200]))
     except Exception as e:
         raise RuntimeError("API调用失败: %s" % e)
 

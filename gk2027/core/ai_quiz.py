@@ -7,11 +7,7 @@ import re
 import urllib.request
 import urllib.error
 
-from config import AI_API_KEY, AI_API_BASE, AI_MODEL
-
-API_KEY = AI_API_KEY
-API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
-MODEL = AI_MODEL
+from config import load_ai_config
 
 SYSTEM_PROMPT = """你是一位高中辅导老师。根据用户提供的知识点内容，生成基础巩固测试题。
 
@@ -44,13 +40,14 @@ SYSTEM_PROMPT = """你是一位高中辅导老师。根据用户提供的知识�
 
 
 def _chat(payload: dict) -> dict:
-    """通用 DeepSeek 对话请求，返回完整响应体。"""
+    """通用 AI 对话请求，返回完整响应体。每次调用动态读取配置（设置页改后立即生效）。"""
+    cfg = load_ai_config()
     req = urllib.request.Request(
-        API_URL,
+        cfg["base"].rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
+            "Authorization": f"Bearer {cfg['key']}",
         },
         method="POST",
     )
@@ -59,7 +56,7 @@ def _chat(payload: dict) -> dict:
             return json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"DeepSeek API错误 {e.code}: {err_body[:200]}")
+        raise RuntimeError(f"AI API错误 {e.code}: {err_body[:200]}")
     except Exception as e:
         raise RuntimeError(f"API调用失败: {e}")
 
@@ -88,8 +85,9 @@ def generate_quiz(subject: str, kp_name: str, points: list[str], count: int = 5)
 
 请生成{count}道基础巩固测试题（课后作业难度），严格按JSON格式输出。"""
 
+    cfg = load_ai_config()
     payload = {
-        "model": MODEL,
+        "model": cfg["model"],
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user_prompt},
@@ -99,11 +97,11 @@ def generate_quiz(subject: str, kp_name: str, points: list[str], count: int = 5)
     }
 
     req = urllib.request.Request(
-        API_URL,
+        cfg["base"].rstrip("/") + "/chat/completions",
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Content-Type": "application/json",
-            "Authorization": f"Bearer {API_KEY}",
+            "Authorization": f"Bearer {cfg['key']}",
         },
         method="POST",
     )
@@ -113,7 +111,7 @@ def generate_quiz(subject: str, kp_name: str, points: list[str], count: int = 5)
             result = json.loads(resp.read().decode("utf-8"))
     except urllib.error.HTTPError as e:
         err_body = e.read().decode("utf-8", errors="replace")
-        raise RuntimeError(f"DeepSeek API错误 {e.code}: {err_body[:200]}")
+        raise RuntimeError(f"AI API错误 {e.code}: {err_body[:200]}")
     except Exception as e:
         raise RuntimeError(f"API调用失败: {e}")
 
