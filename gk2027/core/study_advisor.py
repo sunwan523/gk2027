@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""AI学习建议模块：把用户学习统计汇总成结构化摘要，交给 DeepSeek 生成学习建议。
+"""AI学习建议模块：把用户学习统计汇总成结构化摘要，交给 AI 大模型（OpenAI 兼容接口）生成学习建议。
 
 隐私约定：只发送统计汇总（时长、正确率、掌握率、错题归因等聚合数据），
 不包含姓名、账号、库路径等任何身份信息；页面展示时标注"AI 建议仅供参考"。
@@ -13,11 +13,11 @@ import urllib.request
 import urllib.error
 from datetime import date, timedelta
 
-from config import DEEPSEEK_API_KEY
+from config import AI_API_KEY, AI_API_BASE, AI_MODEL
 
-API_KEY = DEEPSEEK_API_KEY
-API_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek-chat"
+API_KEY = AI_API_KEY
+API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
+MODEL = AI_MODEL
 
 SYSTEM_PROMPT = """你是一位高考复习规划老师。用户会给你一份学习统计摘要（JSON），请基于数据给出可执行的学习建议。
 

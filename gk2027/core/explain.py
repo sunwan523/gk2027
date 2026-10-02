@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""AI 通俗讲解：学习卡片遇到不懂的，让 DeepSeek 换个方式讲懂它。
+"""AI 通俗讲解：学习卡片遇到不懂的，让 AI 大模型（OpenAI 兼容接口）换个方式讲懂它。
 
 用法：explain_point(subject, kp_name, text) -> str（大白话讲解，可朗读）
 """
@@ -7,11 +7,11 @@ import json
 import urllib.error
 import urllib.request
 
-from config import DEEPSEEK_API_KEY
+from config import AI_API_KEY, AI_API_BASE, AI_MODEL
 
-API_KEY = DEEPSEEK_API_KEY
-API_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek-chat"
+API_KEY = AI_API_KEY
+API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
+MODEL = AI_MODEL
 
 SYSTEM_PROMPT = """你是经验丰富的高中教师，最擅长把难懂的知识点用大白话讲明白。
 要求：

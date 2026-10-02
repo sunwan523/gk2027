@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""AI出题模块：调用 DeepSeek API 根据知识点内容自动生成测试题。"""
+"""AI出题模块：调用 AI 大模型（OpenAI 兼容接口）根据知识点内容自动生成测试题。"""
 from __future__ import annotations
 
 import json
@@ -7,11 +7,11 @@ import re
 import urllib.request
 import urllib.error
 
-from config import DEEPSEEK_API_KEY
+from config import AI_API_KEY, AI_API_BASE, AI_MODEL
 
-API_KEY = DEEPSEEK_API_KEY
-API_URL = "https://api.deepseek.com/v1/chat/completions"
-MODEL = "deepseek-chat"
+API_KEY = AI_API_KEY
+API_URL = AI_API_BASE.rstrip("/") + "/chat/completions"
+MODEL = AI_MODEL
 
 SYSTEM_PROMPT = """你是一位高中辅导老师。根据用户提供的知识点内容，生成基础巩固测试题。
 

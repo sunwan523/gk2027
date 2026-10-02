@@ -159,25 +159,31 @@ SERVER_PORT = 8577
 PUBLIC_URL = "http://p.mhtc.top:8577"
 
 # --------------------------------------------------------------------------
-# DeepSeek API Key（绝不硬编码入库，2026-09-30 安全整改）
-# 优先级：环境变量 DEEPSEEK_API_KEY > data/deepseek.key 文件（部署机放密钥文件）
-# 线上部署：把 key 写入 88 挂载卷 /root/gk2027-data/deepseek.key（容器内即 /app/data/deepseek.key）
+# AI 大模型（OpenAI 兼容接口，2026-10-02 起由 DeepSeek 切换为 agnes-ai）
+# 密钥绝不硬编码入库：环境变量 AI_API_KEY > data/ai.key 文件（部署机挂载卷）
+# 兼容旧文件 data/deepseek.key（若 ai.key 不存在则回退读取）
+# 线上部署：把 key 写入 88 挂载卷 /root/gk2027-data/ai.key（容器内即 /app/data/ai.key）
 # --------------------------------------------------------------------------
-def _read_deepseek_key() -> str:
-    k = os.environ.get("DEEPSEEK_API_KEY", "").strip()
+AI_API_BASE = os.environ.get("AI_API_BASE", "https://apihub.agnes-ai.com/v1")
+AI_MODEL = os.environ.get("AI_MODEL", "agnes-2.5-flash")
+
+
+def _read_ai_key() -> str:
+    k = os.environ.get("AI_API_KEY", "").strip()
     if k:
         return k
-    try:
-        p = os.path.join(DATA_DIR, "deepseek.key")
-        if os.path.isfile(p):
-            # utf-8-sig 兼容 Windows 记事本/PowerShell 写入的 BOM
-            k = open(p, encoding="utf-8-sig").read().strip()
-            if k.startswith("sk-"):
-                return k
-    except Exception:
-        pass
+    for name in ("ai.key", "deepseek.key"):   # 新文件名优先，兼容旧部署
+        try:
+            p = os.path.join(DATA_DIR, name)
+            if os.path.isfile(p):
+                # utf-8-sig 兼容 Windows 记事本/PowerShell 写入的 BOM
+                k = open(p, encoding="utf-8-sig").read().strip()
+                if k.startswith("sk-"):
+                    return k
+        except Exception:
+            pass
     return ""
 
 
-DEEPSEEK_API_KEY = _read_deepseek_key()
+AI_API_KEY = _read_ai_key()
 
