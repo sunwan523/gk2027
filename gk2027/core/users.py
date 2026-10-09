@@ -46,6 +46,10 @@ def _load_access_code() -> str:
 
 ACCESS_CODE = _load_access_code()
 
+# 免密模式（家庭自用部署）：data/no_pwd.txt 存在时，登录不再校验准入码和密码，
+# 点名字即进（新名字直接建号）。需要恢复密码门时删除该文件并重启容器即可。
+LOGIN_NO_PWD = os.path.exists(os.path.join(DATA_DIR, "no_pwd.txt"))
+
 _PBKDF2_ITER = 200_000
 MIN_PWD_LEN = 4
 
@@ -141,7 +145,13 @@ def login(name: str, password: str, code: str = "") -> dict:
 
     历史账号（registry 里没有 pwd 字段）在通过准入码后，
     用本次输入的口令完成初始化，之后正常校验。
+    免密模式（LOGIN_NO_PWD）：跳过准入码与密码校验，直接进入/建号。
     """
+    if LOGIN_NO_PWD:
+        u = find_by_name(name)
+        if u is None:
+            return add_user(name, "no-pwd-01")   # 免密建号占位口令
+        return u
     if ACCESS_CODE and (code or "").strip() != ACCESS_CODE:
         raise ValueError("准入码不正确")
     u = find_by_name(name)

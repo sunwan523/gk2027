@@ -276,6 +276,8 @@ async function renderLogin() {
   try {
     const m = await api("/api/auth_mode");
     $("#loginCode").hidden = !m.need_code;
+    $("#loginPwd").hidden = !m.need_pwd;
+    if (!m.need_pwd) { const lp = $("#loginPwd"); if (lp) lp.value = ""; }
   } catch (e) { /* 忽略 */ }
   let users = [];
   try {
@@ -295,17 +297,23 @@ async function renderLogin() {
     b.classList.add("active");
     $("#newName").value = b.dataset.name;
     syncLoginBtn();
-    $("#loginPwd").focus();
+    const lp2 = $("#loginPwd");
+    if (lp2 && !lp2.hidden) lp2.focus();
   };
-  box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => pick(b));
+    box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => pick(b));
   if (users.length === 1) pick(box.querySelector(".user-btn"));   // 只有一个账号：直接选中，免点
+  const lp = $("#loginPwd");
+  if (lp && !lp.hidden) lp.focus();
 }
 function syncLoginBtn() {
-  $("#loginBtn").disabled = !$("#newName").value.trim() || $("#loginPwd").value.length < 4;
+  const needPwd = !$("#loginPwd").hidden;
+  $("#loginBtn").disabled = !$("#newName").value.trim()
+    || (needPwd && $("#loginPwd").value.length < 4);
 }
 async function login(name) {
+  const needPwd = !$("#loginPwd").hidden;
   const pwd = ($("#loginPwd").value || "").trim();
-  if (pwd.length < 4) { toast("密码至少 4 位"); return; }
+  if (needPwd && pwd.length < 4) { toast("密码至少 4 位"); return; }
   let d;
   try {
     d = await post("/api/login", { name, password: pwd, code: ($("#loginCode").value || "").trim() });

@@ -221,8 +221,9 @@ async def api_password(req: Request):
 
 @app.get("/api/auth_mode")
 def api_auth_mode():
-    """告诉前端是否需要准入码，登录页据此显示对应输入框。"""
-    return {"need_code": bool(users.ACCESS_CODE)}
+    """告诉前端登录需要哪些字段：need_code=准入码，need_pwd=密码；免密模式都不需要。"""
+    return {"need_code": bool(users.ACCESS_CODE),
+            "need_pwd": not users.LOGIN_NO_PWD}
 
 
 # ----------------------------------------------------------------------
