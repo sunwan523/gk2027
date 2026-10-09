@@ -186,6 +186,17 @@ async def api_users(req: Request):
     return {"users": [{"id": u["id"], "name": u["name"]} for u in users.list_users()]}
 
 
+@app.get("/api/user_names")
+def api_user_names():
+    """登录页账号名单（公开，但只回名字、不回 id）。
+
+    产品取舍：名字本身不构成攻击面——登录要密码 + 准入码双门，
+    光知道名字既进不了账号、也重置不了密码（重置同样要准入码）。
+    没有它，登录页在换设备/清缓存后只能手打名字。
+    """
+    return {"names": [u["name"] for u in users.list_users()]}
+
+
 @app.post("/api/password")
 async def api_password(req: Request):
     """修改密码。忘记密码时用 access code 重置（old_pwd 留空 + 传 code）。"""

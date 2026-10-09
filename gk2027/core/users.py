@@ -27,7 +27,24 @@ os.makedirs(USERS_DIR, exist_ok=True)
 
 # 家庭准入码（可选）。设置后，任何建号/登录都必须同时提供正确的准入码，
 # 相当于给公网部署再加一道门。容器里用环境变量 GK_ACCESS_CODE 注入。
-ACCESS_CODE = os.environ.get("GK_ACCESS_CODE", "")
+#
+# 取值优先级：
+#   1) 环境变量 GK_ACCESS_CODE
+#   2) data/access_code.txt（挂载卷内的文件，内容即准入码）
+# 之所以加文件兜底：容器是 docker run 无 -e 重建的（见 tools/deploy.ps1），
+# 只靠环境变量的话，每次部署重建容器都会把这道门悄悄丢掉。
+def _load_access_code() -> str:
+    code = os.environ.get("GK_ACCESS_CODE", "").strip()
+    if code:
+        return code
+    try:
+        with open(os.path.join(DATA_DIR, "access_code.txt"), encoding="utf-8") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
+ACCESS_CODE = _load_access_code()
 
 _PBKDF2_ITER = 200_000
 MIN_PWD_LEN = 4

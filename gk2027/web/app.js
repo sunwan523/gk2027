@@ -279,18 +279,26 @@ async function renderLogin() {
   } catch (e) { /* 忽略 */ }
   let users = [];
   try {
-    users = (await api("/api/users")).users || [];     // 需登录，未登录时回退本地记录
+    users = (await api("/api/users")).users || [];     // 需登录，未登录时走下面两档兜底
     try { localStorage.setItem("gk_last_users", JSON.stringify(users.map(u => u.name))); } catch (e) {}
   } catch (e) {
-    try { users = (JSON.parse(localStorage.getItem("gk_last_users") || "[]")).map(n => ({ name: n })); } catch (e2) { users = []; }
+    // 公开账号名列表（只有名字）：登录有密码+准入码双门，光知道名字进不来
+    try { users = ((await api("/api/user_names")).names || []).map(n => ({ name: n })); }
+    catch (e2) {
+      try { users = (JSON.parse(localStorage.getItem("gk_last_users") || "[]")).map(n => ({ name: n })); } catch (e3) { users = []; }
+    }
   }
   box.innerHTML = users.map(u =>
     `<button class="user-btn" data-name="${esc(u.name)}">🧑 ${esc(u.name)}</button>`).join("");
-  box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => {
+  const pick = b => {
+    box.querySelectorAll(".user-btn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
     $("#newName").value = b.dataset.name;
-    $("#loginPwd").focus();
     syncLoginBtn();
-  });
+    $("#loginPwd").focus();
+  };
+  box.querySelectorAll(".user-btn").forEach(b => b.onclick = () => pick(b));
+  if (users.length === 1) pick(box.querySelector(".user-btn"));   // 只有一个账号：直接选中，免点
 }
 function syncLoginBtn() {
   $("#loginBtn").disabled = !$("#newName").value.trim() || $("#loginPwd").value.length < 4;

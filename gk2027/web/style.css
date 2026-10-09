@@ -47,6 +47,7 @@ body {
 .login-box { width:100%; max-width:400px; background:#fff; border-radius:16px; padding:24px 20px; box-shadow:0 2px 12px rgba(0,0,0,.06); }
 .login-box h2 { font-size:20px; margin-bottom:16px; }
 #loginUsers .user-btn { display:block; width:100%; padding:12px; margin-bottom:8px; font-size:16px; background:#f2f5ff; color:#2b4a8f; border:1px solid #dfe6ff; border-radius:10px; cursor:pointer; }
+#loginUsers .user-btn.active { background:#2b4a8f; color:#fff; border-color:#2b4a8f; }
 .login-divider { text-align:center; color:#999; font-size:13px; margin:14px 0; }
 #newName { width:100%; padding:12px; font-size:16px; border:1px solid #ddd; border-radius:10px; margin-bottom:10px; }
 #loginBtn { width:100%; padding:13px; font-size:16px; border:none; border-radius:10px; cursor:pointer; }
