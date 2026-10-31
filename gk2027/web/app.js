@@ -352,8 +352,14 @@ async function renderLearn() {
   el.classList.remove("learn-layout");
   el.innerHTML = `<div class="subj-filter">${["全部", ...SUBJECTS].map(s =>
     `<button class="${s === learnSubj ? "active" : ""}" data-s="${s}">${s}</button>`).join("")}</div>` +
+    `<div id="diagBox"></div>` +
+    `<div id="todayPlanBox"></div>` +
     `<div id="lessonList"><div class="spinner">加载中…</div></div>`;
   el.querySelectorAll(".subj-filter button").forEach(b => b.onclick = () => { learnSubj = b.dataset.s; renderLearn(); });
+  // 入学诊断引导：只在"全部"视图下显示（避免单科筛选时干扰）
+  if (learnSubj === "全部") renderDiagGuide();
+  // 今日学习单：只在"全部"视图下显示（避免单科筛选时干扰）
+  if (learnSubj === "全部") renderTodayPlan();
   try {
     const saved = loadProgress();
     const d = await api("/api/lessons?subject=" + encodeURIComponent(learnSubj));
@@ -374,7 +380,7 @@ async function renderLearn() {
          (saved.results || []).length > 0);
       return `<div class="lesson-card${done ? " lc-done" : ""}">
         <div class="lc-main">
-          <div class="lc-name">${iconOf(l.status)} ${esc(l.subject)}·${esc(l.name)}</div>
+          <div class="lc-name">${iconOf(l.status)} ${esc(l.subject)}·${esc(l.name)}${weightBadge(l.weight)}</div>
           <div class="lc-sub">${done ? "<b>✅ 已掌握</b> · 掌握度 " : "掌握度 "}${l.mastery}%｜自检题 ${l.q_done}/${l.q_total}｜约 ${l.minutes} 分钟</div>
         </div>
         <div class="lc-actions">
@@ -401,8 +407,134 @@ function gaokaoCountdown() {
     return `高考还有 ${days} 天`;
   } catch (e) { return ""; }
 }
+
+// ---------- 入学诊断：快速自评基础知识点（记得→跳过，忘了/没学过→学） ----------
+let diag = { items: [], idx: 0, done: 0, completed: false };
+async function renderDiagGuide() {
+  const box = $("#diagBox");
+  if (!box) return;
+  let d;
+  try { d = await api("/api/diagnose/status"); }
+  catch (e) { box.innerHTML = ""; return; }
+  if (d.completed) { box.innerHTML = ""; return; }
+  const left = d.total - d.done;
+  box.innerHTML = `<div class="diag-card">
+    <div class="diag-head"><span class="diag-ico">🧭</span><span class="diag-title">入学诊断</span><span class="diag-prog">已评 ${d.done}/${d.total}</span></div>
+    <div class="diag-sub">20 年前的底子，哪些还记得？花 2 分钟快速自评，系统会跳过你已会的、只重点补忘了的。</div>
+    <button class="diag-btn" id="diagStart">${d.done > 0 ? "继续诊断 →" : "开始诊断（2 分钟）→"}</button>
+  </div>`;
+  $("#diagStart").onclick = () => { diag.idx = 0; renderDiag(); };
+}
+
+async function renderDiag() {
+  const el = $("#tabLearn");
+  let d;
+  try { d = await api("/api/diagnose/status"); }
+  catch (e) { toast(e.message); return; }
+  diag.items = d.items || [];
+  diag.completed = d.completed;
+  if (diag.completed) {
+    el.innerHTML = `<div class="chart-card" style="text-align:center;padding:30px 0;">
+      <div style="font-size:30px;">🎉</div>
+      <div style="font-size:16px;font-weight:600;margin:8px 0;">诊断完成！</div>
+      <div class="cap">已标记 <b>${diag.items.filter(i => i.diagnosis === "记得").length}</b> 个记得、<b>${diag.items.filter(i => i.diagnosis !== "记得" && i.diagnosis).length}</b> 个要补。系统已为你跳过会的内容。</div>
+    </div>
+    <button class="btn primary" id="diagBack">开始学习 →</button>`;
+    $("#diagBack").onclick = () => { renderLearn(); };
+    return;
+  }
+  // 找到第一个未诊断的
+  while (diag.idx < diag.items.length && diag.items[diag.idx].diagnosis) diag.idx++;
+  if (diag.idx >= diag.items.length) { renderDiag(); return; }
+  const item = diag.items[diag.idx];
+  const n = diag.items.length;
+  const doneCount = diag.items.filter(i => i.diagnosis).length;
+  el.innerHTML = `<div class="page-top"><button class="back-btn" id="diagExit">← 返回</button></div>
+    <div class="q-progress">
+      <div class="bar"><div style="width:${Math.round(doneCount / n * 100)}%"></div></div>
+      <span>诊断 ${doneCount + 1}/${n} · ${esc(item.subject)}</span>
+    </div>
+    <div class="chart-card" style="text-align:center;padding:24px 14px;">
+      <div class="cap">${esc(item.subject)} · ${weightBadge(item.weight)}</div>
+      <div class="diag-name">${esc(item.name)}</div>
+      <div class="diag-q">这个知识点，你现在还记得吗？</div>
+      <div class="diag-opts">
+        <button class="diag-opt do-remember" data-r="记得">✅ 记得，很熟</button>
+        <button class="diag-opt do-forgot" data-r="忘了">🤔 有点印象但忘了</button>
+        <button class="diag-opt do-never" data-r="从没学过">❓ 基本没学过</button>
+      </div>
+    </div>`;
+  $("#diagExit").onclick = () => { renderLearn(); };
+  el.querySelectorAll(".diag-opt").forEach(b => b.onclick = async () => {
+    const r = b.dataset.r;
+    try {
+      await post("/api/diagnose", { kp_id: item.kp_id, result: r });
+      item.diagnosis = r;
+      if (r === "记得") toast("已标记记得，自动跳过");
+      diag.idx += 1;
+      renderDiag();
+    } catch (e) { toast(e.message); }
+  });
+}
+
+// ---------- 今日学习单：从当前进度动态生成"今天学什么" ----------
+async function renderTodayPlan() {
+  const box = $("#todayPlanBox");
+  if (!box) return;
+  let d;
+  try { d = await api("/api/today_plan"); }
+  catch (e) { box.innerHTML = ""; return; }
+  if (d.done || !d.items || !d.items.length) {
+    box.innerHTML = `<div class="today-card done">
+      <div class="tc-head"><span class="tc-ico">🎉</span><span class="tc-title">今日计划已完成</span><span class="tc-total">全部通关</span></div>
+      <div class="tc-sub">今天的学习单都完成了，去「复习」页巩固，或做套「真题」检验一下。</div>
+    </div>`;
+    return;
+  }
+  // 拆分：整块知识点 + 每日滚动任务
+  const blocks = d.items.filter(i => i.tier !== "滚动");
+  const rolling = d.items.filter(i => i.tier === "滚动");
+  const subjColor = { "语文": "#e67e22", "数学": "#4a90d9", "英语": "#2e7d32", "物理": "#7d5cf6", "化学": "#d9534f", "生物": "#1fd16f" };
+  box.innerHTML = `<div class="today-card">
+    <div class="tc-head">
+      <span class="tc-ico">📅</span>
+      <span class="tc-title">今日学习单</span>
+      <span class="tc-total">约 ${d.total_min} 分钟</span>
+    </div>
+    <div class="tc-sub">按你的进度智能排的，做完这些就离目标近一步 👇</div>
+    <div class="tc-items">
+      ${blocks.map(i => `<div class="tc-item" data-kp="${esc(i.kp_id)}">
+        <span class="tc-dot" style="background:${subjColor[i.subject] || "#4a90d9"}"></span>
+        <span class="tc-subj">${esc(i.subject)}</span>
+        <span class="tc-name">${esc(i.name)}${weightBadge(i.weight)}</span>
+        <span class="tc-min">${i.minutes}分</span>
+        <span class="tc-go">${i.status === "已掌握" ? "复习 →" : (i.mastery > 0 ? "继续 →" : "开始 →")}</span>
+      </div>`).join("")}
+      ${rolling.length ? `<div class="tc-rolling">
+        ${rolling.map(i => `<div class="tc-item tc-roll" data-kp="${esc(i.kp_id)}">
+          <span class="tc-dot" style="background:#aaa"></span>
+          <span class="tc-subj">${esc(i.subject)}</span>
+          <span class="tc-name">${esc(i.name)}</span>
+          <span class="tc-min">${i.minutes}分</span>
+          <span class="tc-go">去 →</span>
+        </div>`).join("")}
+      </div>` : ""}
+    </div>
+  </div>`;
+  box.querySelectorAll(".tc-item").forEach(it => it.onclick = () => startLesson(it.dataset.kp));
+}
 function iconOf(status) {
   return { "可学": "▶️", "学习中": "🔶", "需复习": "🔁", "已掌握": "✅", "未解锁": "🔒" }[status] || "▶️";
+}
+// 考点地位徽章：高频/常规/低频 → 视觉提示
+function weightBadge(w) {
+  if (!w) return "";
+  const map = {
+    "高频考点": '<span class="w-badge wb-high">🔥 高频</span>',
+    "常规": '<span class="w-badge wb-mid">常规</span>',
+    "低频": '<span class="w-badge wb-low">低频</span>',
+  };
+  return map[w] || `<span class="w-badge wb-mid">${esc(w)}</span>`;
 }
 
 // ---------- 开课 ----------
@@ -433,7 +565,8 @@ async function startLesson(kpId) {
     }
     lesson = { kp_id: d.kp_id, name: d.name, subject: d.subject, points: d.points,
                questions: d.questions, idx: idx, phase: phase,
-               results: has ? (saved.results || []) : [], rewarded: false };
+               results: has ? (saved.results || []) : [], rewarded: false,
+               weight: d.weight || "", tier: d.tier || "" };
     deck.idx = has ? (saved.card_idx || 0) : 0;
     renderLesson();
   } catch (e) { toast(e.message); }
@@ -477,15 +610,26 @@ function renderLesson() {
     el.innerHTML = `
       <div class="learn-top">
         <button class="back-btn" id="exitLearn" title="返回列表">←</button>
-        <h3 class="learn-title">📖 ${esc(L.name)}</h3>
+        <h3 class="learn-title">📖 ${esc(L.name)}${weightBadge(L.weight)}</h3>
         <span class="deck-pos" id="deckPos"></span>
         <button class="ai-avatar" id="helpAi" title="这句没懂？让 AI 讲懂"><span class="ai-cap">🎓</span><span>AI</span></button>
       </div>
+      <div class="stage-nav">
+        <div class="stage-step on" data-s="learn"><span class="sn">1</span><span class="sl">读要点</span></div>
+        <div class="stage-line"></div>
+        <div class="stage-step" data-s="q"><span class="sn">2</span><span class="sl">做自检</span></div>
+        <div class="stage-line"></div>
+        <div class="stage-step" data-s="done"><span class="sn">3</span><span class="sl">通关</span></div>
+      </div>
+      <div class="stage-hint">📌 ${L.tier === "初中" ? "这是初中基础，补上它高中才能跟得上" : "先把要点读懂、会背，再点「🖊 开始练习」做自检题"}</div>
       <div id="deckWrap"></div>
       <div id="aiExplainBox"></div>
       <button class="deck-tab" id="deckTab" hidden title="展开播放控制">✍️</button>`;
     renderDeck(L.points);
     $("#exitLearn").onclick = exitToLearn;
+    // 阶段导航：读要点(当前)可点"开始练习"直接跳到自检
+    $(".stage-step[data-s='q']").onclick = () => { lesson.phase = "q"; lesson.idx = 0; renderLesson(); };
+    $(".stage-step[data-s='done']").onclick = () => { if (L.results.length) { lesson.idx = L.questions.length; finishLesson(L); } else toast("先做完自检题才能通关哦"); };
     $("#deckTab").onclick = () => {
       const p = $(".deck-player"); if (p) p.classList.remove("collapsed");
       $("#deckTab").hidden = true;
@@ -525,6 +669,13 @@ function renderLesson() {
   }
   const q = L.questions[L.idx];
   el.innerHTML = `<div class="page-top"><button class="back-btn" id="exitQuiz">← 返回列表</button></div>
+    <div class="stage-nav">
+      <div class="stage-step done" data-s="learn"><span class="sn">1</span><span class="sl">读要点</span></div>
+      <div class="stage-line"></div>
+      <div class="stage-step on" data-s="q"><span class="sn">2</span><span class="sl">做自检</span></div>
+      <div class="stage-line"></div>
+      <div class="stage-step" data-s="done"><span class="sn">3</span><span class="sl">通关</span></div>
+    </div>
     <div class="q-progress">
       <div class="bar"><div style="width:${Math.round(L.idx / L.questions.length * 100)}%"></div></div>
       <span>${esc(L.name)} · 第 ${L.idx + 1}/${L.questions.length} 题 · ${q.qtype}</span>
@@ -533,6 +684,7 @@ function renderLesson() {
     <div id="qBody"></div>`;
   const qb = $("#qBody");
   const eb = $("#exitQuiz"); if (eb) eb.onclick = exitToLearn;
+  $(".stage-step[data-s='learn']").onclick = () => { lesson.phase = "learn"; renderLesson(); };
   if (L.phase === "q") {
     if (q.qtype === "选择题") {
       qb.innerHTML = q.options.map((o, i) =>
@@ -561,7 +713,8 @@ function renderLesson() {
     }
   } else if (L.phase === "peek") {
     qb.innerHTML = `<div class="fb-answer"><b>答案：</b>${esc(q.answer)}</div>` +
-      (q.analysis ? `<div class="fb-answer">解析：${esc(q.analysis)}</div>` : "") +
+      (q.analysis ? `<div class="fb-answer fb-analysis"><b>💡 解析：</b>${esc(q.analysis)}</div>` : "") +
+      `<div class="cap" style="margin:10px 0 4px;">对照答案，诚实自评：</div>` +
       `<div class="btn-row">
         <button class="btn success" id="selfRight">✅ 我答对了</button>
         <button class="btn danger" id="selfWrong">❌ 答错了</button>
@@ -569,18 +722,26 @@ function renderLesson() {
     $("#selfRight").onclick = async () => { await selfAnswer(q, true); };
     $("#selfWrong").onclick = async () => { await selfAnswer(q, false); };
   } else if (L.phase === "fb") {
-    qb.innerHTML = (L.lastOk
-      ? `<div class="fb-correct">✅ 答对了 +5 XP</div>`
-      : `<div class="fb-wrong">❌ 答错了，已进错题本（稍后自动复习）</div>`) +
+    const lastOk = L.lastOk;
+    qb.innerHTML = (lastOk
+      ? `<div class="fb-correct">✅ 答对了！+5 XP，继续保持</div>`
+      : `<div class="fb-wrong">❌ 这题没答对，别急——看清解析，搞懂为什么</div>`) +
       `<div class="fb-answer"><b>答案：</b>${esc(q.answer)}</div>` +
-      (q.analysis ? `<div class="fb-answer">解析：${esc(q.analysis)}</div>` : "") +
-      (L.lastOk ? "" : `<select class="attr-select" id="attrSel">
-        <option value="">（默认：概念不清）</option>
-        ${["概念不清", "方法未掌握", "计算失误", "审题偏差", "时间不够", "表述不规范"].map(a => `<option>${a}</option>`).join("")}
-      </select>`) +
-      `<button class="btn primary" id="nextQ">${L.idx + 1 >= L.questions.length ? "完成本节 🎉" : "下一题 →"}</button>`;
-    const attr = $("#attrSel");
-    if (attr) attr.onchange = async () => { if (attr.value) await post("/api/wrong_attr", { qid: q.qid, attribution: attr.value }); };
+      (q.analysis ? `<div class="fb-answer fb-analysis"><b>💡 解析：</b>${esc(q.analysis)}</div>` : "") +
+      (lastOk ? "" : `<div class="attr-tag-group">
+        <div class="cap" style="margin-bottom:6px;">这道题错在哪？（选一个，方便针对性复习）</div>
+        <div class="attr-tags">
+          ${["概念不清", "方法未掌握", "计算失误", "审题偏差", "时间不够", "表述不规范"].map(a => `<button class="attr-tag" data-a="${a}">${a}</button>`).join("")}
+        </div>
+      </div>`) +
+      `<button class="btn primary mt12" id="nextQ">${L.idx + 1 >= L.questions.length ? "完成本节 🎉" : "下一题 →"}</button>`;
+    const tags = qb.querySelectorAll(".attr-tag");
+    tags.forEach(t => t.onclick = async () => {
+      tags.forEach(x => x.classList.remove("on"));
+      t.classList.add("on");
+      await post("/api/wrong_attr", { qid: q.qid, attribution: t.dataset.a });
+      toast("已记下错因：" + t.dataset.a);
+    });
     $("#nextQ").onclick = () => { L.idx += 1; L.phase = "q"; renderLesson(); };
   }
 }
@@ -621,13 +782,47 @@ async function finishLesson(L) {
 function renderLessonDone(L) {
   const el = $("#tabLearn");
   const r = L.reward || { bonus: 0, newly_unlocked: 0, mastery: 0, status: "学习中" };
-  el.innerHTML = `<div style="text-align:center;padding:20px 0 8px;">🎉</div>
+  const ok = (L.results || []).filter(Boolean).length;
+  const total = (L.results || []).length;
+  const pct = total ? Math.round(ok / total * 100) : 0;
+  const allOk = total > 0 && ok === total;
+  // 错题（供回顾）
+  const wrongs = (L.questions || []).filter((q, i) => (L.results || [])[i] === false);
+  let reviewHtml = "";
+  if (wrongs.length) {
+    reviewHtml = `<div class="chart-card">
+      <div class="cc-title">🔍 易错回顾（${wrongs.length} 题）</div>
+      ${wrongs.map(q => `<div class="done-wrong">
+        <div class="dw-q">${esc(q.stem)}</div>
+        <div class="dw-a">✅ ${esc(q.answer)}</div>
+      </div>`).join("")}
+    </div>`;
+  }
+  const verdict = allOk ? "全对通关！这个点你已经拿下了 🔥"
+    : pct >= 60 ? "不错，错题再看一遍就能稳住"
+    : "还有提升空间，建议回读要点再刷一遍";
+  el.innerHTML = `<div style="text-align:center;padding:18px 0 4px;font-size:34px;">🎉</div>
     <h3 style="text-align:center;">通关：${esc(L.name)}</h3>
-    <div class="chart-card mt12">${r.bonus ? "+" + r.bonus + " XP（全对奖励 " + (L.results.length > 0 && L.results.every(Boolean) ? "已含" : "未含") + "）" : "本课已学完 🎉"}
-      <div class="cap mt8">掌握度 ${r.mastery}%（${esc(r.status)}）${r.newly_unlocked ? "｜🔓 解锁了 " + r.newly_unlocked + " 节新课" : ""}</div>
+    <div class="stage-nav">
+      <div class="stage-step done"><span class="sn">1</span><span class="sl">读要点</span></div>
+      <div class="stage-line"></div>
+      <div class="stage-step done"><span class="sn">2</span><span class="sl">做自检</span></div>
+      <div class="stage-line"></div>
+      <div class="stage-step done"><span class="sn">3</span><span class="sl">通关</span></div>
     </div>
+    <div class="chart-card mt12" style="text-align:center;">
+      <div style="font-size:15px;color:#333;">${verdict}</div>
+      <div class="done-stats">
+        <div class="ds-item"><div class="ds-v">${ok}/${total}</div><div class="ds-l">答对题数</div></div>
+        <div class="ds-item"><div class="ds-v">${pct}%</div><div class="ds-l">正确率</div></div>
+        <div class="ds-item"><div class="ds-v">${r.mastery}%</div><div class="ds-l">掌握度</div></div>
+        <div class="ds-item"><div class="ds-v">+${r.bonus}</div><div class="ds-l">XP${allOk ? "（全对）" : ""}</div></div>
+      </div>
+      ${r.newly_unlocked ? `<div class="cap mt8">🔓 解锁了 ${r.newly_unlocked} 节新课，去列表看看</div>` : ""}
+    </div>
+    ${reviewHtml}
     <div class="btn-row">
-      <button class="btn primary" id="aiQuizBtn">🤖 AI出题测试（再练5题）</button>
+      <button class="btn primary" id="aiQuizBtn">🤖 再来 5 题巩固</button>
       <button class="btn ghost" id="backList">返回课程列表</button>
     </div>`;
   $("#aiQuizBtn").onclick = () => { aiQuiz = { kp_id: L.kp_id, name: L.name, idx: 0, results: [], phase: "q" }; renderAiQuiz(); };
@@ -855,9 +1050,14 @@ async function renderAiQuiz() {
 // ---------- 复习 ----------
 async function renderReview() {
   const el = $("#tabReview");
-  el.innerHTML = `<h3>🔁 复习</h3><div id="revBody"><div class="spinner">加载中…</div></div>`;
+  el.innerHTML = `<h3>🔁 复习</h3>
+    <div class="wrong-entry" id="wrongEntry"><span class="we-ico">📕</span><span class="we-txt">错题本</span><span class="we-count" id="weCount">…</span><span class="we-go">去重做 →</span></div>
+    <div id="revBody"><div class="spinner">加载中…</div></div>`;
+  $("#wrongEntry").onclick = () => renderWrongBook();
   try {
     const d = await api("/api/reviews");
+    // 顺带拉错题数
+    api("/api/wrong_list").then(w => { const c = $("#weCount"); if (c) c.textContent = w.total + " 题未解决"; }).catch(() => {});
     review = { cards: d.cards, idx: 0, peek: false };
     const body = $("#revBody");
     if (!d.cards.length) {
@@ -871,29 +1071,125 @@ function drawReviewCard() {
   const el = $("#tabReview");
   if (review.idx >= review.cards.length) {
     el.innerHTML = `<h3>🔁 复习</h3>
-      <div class="chart-card" style="text-align:center;padding:30px 0;">🎉 本轮复习完成！共复习 ${review.idx} 张卡。</div>
-      <button class="btn primary" id="revAgain">再来一轮检查</button>`;
+      <div class="chart-card" style="text-align:center;padding:30px 0;">
+        <div style="font-size:30px;">🎉</div>
+        <div style="font-size:16px;font-weight:600;margin:8px 0;">本轮复习完成！</div>
+        <div class="cap">共复习 ${review.idx} 张卡片，记忆又加深了一层</div>
+      </div>
+      <button class="btn primary" id="revAgain">再来一轮检查</button>
+      <button class="btn ghost mt12" id="revToLearn">去学新知识 →</button>`;
     $("#revAgain").onclick = () => { review.idx = 0; drawReviewCard(); };
+    $("#revToLearn").onclick = () => switchTab("tabLearn");
     return;
   }
   const card = review.cards[review.idx];
+  const prog = Math.round(review.idx / review.cards.length * 100);
   el.innerHTML = `<h3>🔁 复习</h3>
-    <div class="q-progress"><div class="bar"><div style="width:${Math.round(review.idx / review.cards.length * 100)}%"></div></div>
+    <div class="q-progress"><div class="bar"><div style="width:${prog}%"></div></div>
       <span>${review.idx + 1}/${review.cards.length} · ${esc(card.subject)} · ${esc(card.kind)}</span></div>
     <div class="review-card">
       <div class="review-front">${esc(card.front)}</div>
       <div id="revBack"></div>
     </div>
-    <div class="btn-row mt12"><button class="btn ghost" id="peekRev">显示答案</button></div>`;
+    <div class="btn-row mt12"><button class="btn ghost" id="peekRev">👀 显示答案</button></div>`;
   $("#peekRev").onclick = () => {
     review.peek = true;
     $("#revBack").innerHTML = `<div class="review-back">${esc(card.back || "（无背面内容）")}</div>`;
-    $("#peekRev").parentElement.innerHTML = `<div class="btn-row mt12">
-      <button class="btn danger" id="forgotCard">😅 忘了</button>
-      <button class="btn success" id="rememberCard">🙂 记得</button></div>`;
+    $("#peekRev").parentElement.innerHTML = `<div class="cap" style="margin:10px 0 4px;">答案对了吗？诚实选择：</div>
+      <div class="btn-row mt12">
+      <button class="btn danger" id="forgotCard">😅 没想起来</button>
+      <button class="btn success" id="rememberCard">🙂 想起来了</button></div>`;
     $("#forgotCard").onclick = async () => { await post("/api/review", { card_id: card.card_id, remembered: false }); review.idx += 1; review.peek = false; await refreshHeader(); drawReviewCard(); };
     $("#rememberCard").onclick = async () => { await post("/api/review", { card_id: card.card_id, remembered: true }); review.idx += 1; review.peek = false; await refreshHeader(); drawReviewCard(); };
   };
+}
+
+// ---------- 错题本：未解决错题逐题重做 ----------
+let wrongBook = { items: [], idx: 0, subj: "全部", phase: "list", showAnswer: false, lastOk: false };
+async function renderWrongBook() {
+  const el = $("#tabReview");
+  if (wrongBook.phase === "list") {
+    el.innerHTML = `<button class="sub-back" onclick="switchTab('tabReview')">← 复习</button><h3>📕 错题本</h3>
+      <div class="cap">答错的题都在这，逐题重做，连续答对 3 次自动移除</div>
+      <div class="subj-filter">${["全部", ...SUBJECTS].map(s =>
+        `<button class="${s === wrongBook.subj ? "active" : ""}" data-s="${s}">${s}</button>`).join("")}</div>
+      <div id="wrongList"><div class="spinner">加载中…</div></div>`;
+    el.querySelectorAll(".subj-filter button").forEach(b => b.onclick = () => { wrongBook.subj = b.dataset.s; wrongBook.idx = 0; renderWrongBook(); });
+    try {
+      const d = await api("/api/wrong_list?subject=" + encodeURIComponent(wrongBook.subj));
+      wrongBook.items = d.items || [];
+      const list = $("#wrongList");
+      if (!wrongBook.items.length) {
+        list.innerHTML = `<div class="chart-card" style="text-align:center;color:#888;padding:26px;">🎉 没有未解决的错题！继续保持。</div>`;
+        return;
+      }
+      list.innerHTML = wrongBook.items.map((w, i) => `<div class="wrong-item" data-i="${i}">
+        <div class="wi-top">
+          <span class="wi-subj">${esc(w.subject)}</span>
+          <span class="wi-attr">${esc(w.attribution)}</span>
+          <span class="wi-count">错 ${w.wrong_count} 次</span>
+        </div>
+        <div class="wi-stem">${esc(w.stem)}</div>
+        <button class="wi-redo" data-i="${i}">重做 →</button>
+      </div>`).join("");
+      list.querySelectorAll(".wi-redo").forEach(b => b.onclick = () => { wrongBook.idx = parseInt(b.dataset.i); wrongBook.phase = "redo"; wrongBook.showAnswer = false; renderWrongBook(); });
+    } catch (e) { $("#wrongList").innerHTML = `<div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`; }
+    return;
+  }
+  // 重做单题
+  const w = wrongBook.items[wrongBook.idx];
+  if (!w) { wrongBook.phase = "list"; renderWrongBook(); return; }
+  const n = wrongBook.items.length;
+  el.innerHTML = `<button class="sub-back" id="wbBack">← 错题本</button>
+    <div class="q-progress">
+      <div class="bar"><div style="width:${Math.round(wrongBook.idx / n * 100)}%"></div></div>
+      <span>错题 ${wrongBook.idx + 1}/${n} · ${esc(w.subject)} · ${esc(w.attribution)}</span>
+    </div>
+    <div class="q-stem">${esc(w.stem)}</div>
+    <div id="wbBody"></div>`;
+  $("#wbBack").onclick = () => { wrongBook.phase = "list"; wrongBook.showAnswer = false; renderWrongBook(); };
+  const wb = $("#wbBody");
+  if (!wrongBook.showAnswer) {
+    if (w.qtype === "选择题") {
+      // 选择题：从 stem 里解析不出选项，让用户先回想再看答案（错题本简化：直接自评）
+      wb.innerHTML = `<div class="cap">先在脑中/纸上重做，再对照答案诚实自评：</div>
+        <div class="btn-row">
+          <button class="btn success" id="wbRight">✅ 这次答对了</button>
+          <button class="btn danger" id="wbWrong">❌ 还是错了</button>
+        </div>`;
+      $("#wbRight").onclick = () => { wrongBook.showAnswer = true; wrongBook.lastOk = true; submitWrongRedo(w, true); };
+      $("#wbWrong").onclick = () => { wrongBook.showAnswer = true; wrongBook.lastOk = false; submitWrongRedo(w, false); };
+    } else {
+      wb.innerHTML = `<textarea class="input" style="min-height:100px" id="wbFill" placeholder="写下你的答案"></textarea>
+        <button class="btn primary mt12" id="wbSubmit">提交答案</button>`;
+      $("#wbSubmit").onclick = async () => {
+        const u = ($("#wbFill").value || "").trim();
+        if (!u) { toast("先写下答案"); return; }
+        // 用 answer_self 记录（自评，因为填空题严格判分可能误伤）
+        wrongBook.showAnswer = true;
+        wrongBook.lastOk = true;
+        await submitWrongRedo(w, true);
+      };
+    }
+  } else {
+    wb.innerHTML = (wrongBook.lastOk
+      ? `<div class="fb-correct">✅ 已记录答对！连续答对 3 次会自动移除这道错题</div>`
+      : `<div class="fb-wrong">❌ 已记录，别灰心，看清解析下次一定对</div>`) +
+      `<div class="fb-answer"><b>答案：</b>${esc(w.answer)}</div>` +
+      (w.analysis ? `<div class="fb-answer fb-analysis"><b>💡 解析：</b>${esc(w.analysis)}</div>` : "") +
+      `<button class="btn primary mt12" id="wbNext">${wrongBook.idx + 1 >= n ? "完成 🎉" : "下一题 →"}</button>`;
+    $("#wbNext").onclick = () => {
+      if (wrongBook.idx + 1 >= n) { wrongBook.phase = "list"; wrongBook.showAnswer = false; wrongBook.subj = "全部"; renderWrongBook(); }
+      else { wrongBook.idx += 1; wrongBook.showAnswer = false; renderWrongBook(); }
+    };
+  }
+}
+async function submitWrongRedo(w, ok) {
+  try {
+    await post("/api/answer_self", { qid: w.qid, correct: ok, kp_id: w.kp_id || "" });
+    await refreshHeader();
+    renderWrongBook();
+  } catch (e) { toast(e.message || "记录失败"); }
 }
 
 // ---------- 我的 ----------
@@ -919,7 +1215,10 @@ async function renderMine() {
       </div>
     </div>
     <div class="mine-menu">
+      <button class="m-item m-item-hl" data-goto="targets">🎯 600 分目标看板</button>
+      <button class="m-item" data-goto="map">🗺️ 学习地图</button>
       <button class="m-item" data-goto="tabRecite">📖 背诵听读</button>
+      <button class="m-item" data-goto="wrongbook">📕 错题本</button>
       <button class="m-item" data-goto="tabStats">📊 学习统计</button>
       <button class="m-item" data-goto="tabExport">📄 导出 PDF</button>
       <button class="m-item" data-goto="tabSettings">⚙️ 设置</button>
@@ -928,7 +1227,86 @@ async function renderMine() {
     <div class="cap" style="text-align:center;margin-top:18px;">90 天高考复习 · 坚持就是胜利 💪</div>`;
   el.querySelectorAll(".m-item").forEach(b => b.onclick = () => {
     if (b.dataset.goto === "tabSpace") { gateSpace(); return; }
+    if (b.dataset.goto === "wrongbook") { wrongBook.phase = "list"; wrongBook.subj = "全部"; wrongBook.showAnswer = false; switchTab("tabReview"); renderWrongBook(); return; }
+    if (b.dataset.goto === "targets") { switchTab("tabMine"); renderTargets(); return; }
+    if (b.dataset.goto === "map") { switchTab("tabMine"); renderMap(); return; }
     switchTab(b.dataset.goto);
+  });
+}
+
+// ---------- 600 分目标看板 ----------
+async function renderTargets() {
+  const el = $("#tabMine");
+  el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><h3>🎯 600 分目标看板</h3><div class="spinner">加载中…</div>`;
+  let d;
+  try { d = await api("/api/targets"); }
+  catch (e) { el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`; return; }
+  const daysColor = d.days_left <= 100 ? "#d9534f" : d.days_left <= 180 ? "#e67e22" : "#4a90d9";
+  el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><h3>🎯 600 分目标看板</h3>
+    <div class="target-hero">
+      <div class="th-goal">目标 <b>${d.goal}</b> 分</div>
+      <div class="th-sub">内部瞄准 ${d.aim} 分 · 各科目标合计 ${d.target_total} 分</div>
+      <div class="th-days" style="color:${daysColor}">⏳ 距高考 <b>${d.days_left}</b> 天</div>
+    </div>
+    <div class="chart-card"><div class="cc-title">六科目标 vs 当前进度</div>
+      ${d.subjects.map(s => {
+        const pct = Math.min(100, Math.round(s.mastered / Math.max(1, s.total) * 100));
+        return `<div class="tgt-row">
+          <div class="tgt-subj">${esc(s.subject)}</div>
+          <div class="tgt-bar"><div class="tgt-fill" style="width:${pct}%"></div></div>
+          <div class="tgt-val">${s.mastered}/${s.total} 点</div>
+          <div class="tgt-target">目标 ${s.target}</div>
+        </div>`;
+      }).join("")}
+      <div class="cap mt8">掌握度满点不代表得分，需配合真题模考检验（各科目标分见上，化学/生物为赋分制）。</div>
+    </div>
+    <div class="chart-card"><div class="cc-title">里程碑</div>
+      ${d.milestones.map(m => `<div class="ms-item${m.reached ? " reached" : ""}">
+        <span class="ms-dot">${m.reached ? "✅" : "○"}</span>
+        <span class="ms-label">${esc(m.label)}</span>
+        <span class="ms-date">${m.reached ? "已到" : esc(m.date)}</span>
+        ${m.targets && Object.keys(m.targets).length ? `<span class="ms-tgt">${Object.entries(m.targets).map(([k,v]) => k + " " + v).join(" / ")}</span>` : ""}
+      </div>`).join("")}
+    </div>
+    <div class="chart-card"><div class="cc-title">📅 重要日期</div>
+      ${d.admin.map(a => `<div class="ms-item${a.passed ? " reached" : ""}">
+        <span class="ms-dot">${a.passed ? "✅" : a.days_left <= 30 ? "⚠️" : "○"}</span>
+        <span class="ms-label">${esc(a.label)}</span>
+        <span class="ms-date">${esc(a.date)}${a.passed ? "" : " · 剩 " + a.days_left + " 天"}</span>
+      </div>`).join("")}
+    </div>`;
+}
+
+// ---------- 学习地图：165 知识点总进度 ----------
+async function renderMap() {
+  const el = $("#tabMine");
+  el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><h3>🗺️ 学习地图</h3><div class="spinner">加载中…</div>`;
+  let d;
+  try { d = await api("/api/map"); }
+  catch (e) { el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><div class="chart-card" style="color:#d9534f;">${esc(e.message)}</div>`; return; }
+  const statusColor = { "已掌握": "#1fd16f", "学习中": "#f5a623", "需复习": "#e67e22", "可学": "#4a90d9", "未解锁": "#c3c9d4" };
+  const statusIcon = { "已掌握": "✅", "学习中": "🔶", "需复习": "🔁", "可学": "▶️", "未解锁": "🔒" };
+  el.innerHTML = `<button class="sub-back" onclick="renderMine()">← 我的</button><h3>🗺️ 学习地图</h3>
+    <div class="cap">六科知识点全景，点一个直达学习。已掌握=绿色，可学=蓝色，未解锁=灰色。</div>
+    <div class="map-legend">
+      ${Object.entries(statusColor).map(([k, c]) => `<span class="lg"><i style="background:${c}"></i>${k}</span>`).join("")}
+    </div>
+    ${d.tree.map(sub => `
+      <div class="map-subj">
+        <div class="map-subj-head">
+          <span class="map-subj-name">${esc(sub.subject)}</span>
+          <span class="map-subj-prog">${sub.mastered}/${sub.total} 已掌握</span>
+        </div>
+        <div class="map-grid">
+          ${sub.items.map(i => `<div class="map-node ${i.status === "已掌握" ? "done" : i.status === "未解锁" ? "locked" : ""}" data-kp="${esc(i.kp_id)}" title="${esc(i.name)} · ${esc(i.status)} · ${i.mastery}%">
+            <span class="map-dot" style="background:${statusColor[i.status] || "#ccc"}"></span>
+            <span class="map-name">${esc(i.name)}</span>
+            ${i.has_quiz ? "" : "<span class='map-noq'>无题</span>"}
+          </div>`).join("")}
+        </div>
+      </div>`).join("")}`;
+  el.querySelectorAll(".map-node").forEach(n => n.onclick = () => {
+    if (n.dataset.kp) { switchTab("tabLearn"); startLesson(n.dataset.kp); }
   });
 }
 
@@ -1089,11 +1467,17 @@ async function renderStats() {
         <div class="metric"><div class="m-val">${t.week_min}</div><div class="m-label">本周（分）</div></div>
         <div class="metric"><div class="m-val">${t.total_min}</div><div class="m-label">累计（分）</div></div>
       </div>
+      <div class="action-card" id="statTodayPlan">
+        <div class="ac-ico">🎯</div>
+        <div class="ac-main"><div class="ac-title">接下来学什么？</div><div class="ac-sub">看今日学习单，或直接去学习页</div></div>
+        <button class="ac-btn" id="acToday">今日计划</button>
+        <button class="ac-btn ghost" id="acLearn">去学习</button>
+      </div>
       ${barsHtml("每日学习分钟（近14天）", t.per_day, "min")}
       ${barsHtml("各科学习分钟（近14天）", t.per_subject, "min")}
       ${barsHtml("各科掌握率（%）", Object.fromEntries(d.mastery.by_subject.map(m => [m.subject, m.pct])), "%")}
-      <div class="chart-card"><div class="cc-title">未掌握知识点（${d.mastery.weak.length} 个）</div>
-        ${d.mastery.weak.slice(0, 12).map(w => `<div class="weak-item">${esc(w.subject)} · ${esc(w.name)} · ${esc(w.status)} · ${w.mastery}%</div>`).join("")}
+      <div class="chart-card"><div class="cc-title">未掌握知识点（${d.mastery.weak.length} 个）· 点击直达学习</div>
+        ${d.mastery.weak.slice(0, 12).map(w => `<div class="weak-item" data-kp="${esc(w.kp_id)}" style="cursor:pointer;">${esc(w.subject)} · ${esc(w.name)} · ${esc(w.status)} · ${w.mastery}%</div>`).join("")}
         ${d.mastery.weak.length > 12 ? `<div class="cap">…共 ${d.mastery.weak.length} 个</div>` : ""}
       </div>
       ${Object.keys(d.wrong.attributions).length ? barsHtml("未解决错题归因", d.wrong.attributions, "题") : ""}
@@ -1111,6 +1495,11 @@ async function renderStats() {
         <div id="adviceBox"></div>
       </div>
       <button class="btn ghost mt16" id="logoutBtn">🔄 切换用户 / 退出</button>`;
+    $("#acToday").onclick = () => switchTab("tabLearn");
+    $("#acLearn").onclick = () => switchTab("tabLearn");
+    el.querySelectorAll(".weak-item").forEach(w => w.onclick = () => {
+      if (w.dataset.kp) { switchTab("tabLearn"); startLesson(w.dataset.kp); }
+    });
     $("#genAdvice").onclick = async () => {
       const box = $("#adviceBox");
       box.innerHTML = `<div class="spinner">DeepSeek 正在分析你的学习数据…</div>`;
@@ -1954,6 +2343,7 @@ function renderExamRun() {
   const el = $("#tabExam");
   const p = exam.cur, q = exam.qs[exam.idx], n = exam.qs.length;
   const used = Math.round((Date.now() - exam.t0) / 60000);
+  const answered = exam.qs.filter(x => exam.answers[x.qid] || exam.self[x.qid] !== undefined).length;
   let body = "";
   if (q.qtype === "选择题") {
     body = (q.options || []).map(o => {
@@ -1984,6 +2374,12 @@ function renderExamRun() {
     + '<div class="cc-title">第 ' + (exam.idx + 1) + '/' + n + ' 题 · ' + esc(q.qtype)
     + (q.question_no ? ' · 原卷 ' + esc(q.question_no) : '')
     + ' · 已用 ' + used + '/' + (p.duration || 75) + ' 分钟</div>'
+    + '<div class="exam-dots">' + exam.qs.map(x => {
+        const st = exam.answers[x.qid] ? "a" : (exam.self[x.qid] !== undefined ? "a" : "");
+        const cur = x.qid === q.qid ? " cur" : "";
+        return '<span class="ex-dot' + st + cur + '" onclick="exam.idx=' + exam.qs.indexOf(x) + '; renderExamRun()"></span>';
+      }).join("") + '</div>'
+    + '<div class="cap" style="margin:4px 0 0;">已作答 ' + answered + '/' + n + ' 题</div>'
     + (q.verified ? '' : '<div class="exam-meta"><span class="warn-badge">⚠️ 待核对 · 答案以出处为准</span>'
         + (q.source_ref ? '<a class="src-link" href="' + esc(q.source_ref) + '" target="_blank" rel="noopener">查看出处</a>' : '') + '</div>')
     + '<div style="font-size:15px;line-height:1.8;white-space:pre-wrap">' + esc(q.stem) + '</div>'

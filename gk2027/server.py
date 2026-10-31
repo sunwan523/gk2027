@@ -307,7 +307,7 @@ async def api_lesson_start(req: Request):
     kp_id = body.get("kp_id", "")
     if not kp_id:
         return JSONResponse({"error": "缺少 kp_id"}, status_code=400)
-    row = c.execute("SELECT subject, name FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
+    row = c.execute("SELECT subject, name, weight, tier FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
     qs = queue.start_lesson(c, kp_id)
     if not qs:
         return JSONResponse({"error": "该知识点暂无自检题"}, status_code=400)
@@ -315,6 +315,8 @@ async def api_lesson_start(req: Request):
     return {"kp_id": kp_id,
             "subject": row["subject"] if row else "数学",
             "name": row["name"] if row else kp_id,
+            "weight": row["weight"] if row else "",
+            "tier": row["tier"] if row else "",
             "points": pts, "questions": qs}
 
 
@@ -483,9 +485,10 @@ async def api_stats(req: Request):
         mastery.append({"subject": r["subject"], "mastered": r["m"] or 0, "total": r["n"],
                         "pct": round((r["m"] or 0) * 100 / max(1, r["n"]))})
     weak = [{"subject": r["subject"], "name": r["name"], "status": r["status"],
+             "kp_id": r["id"],
              "mastery": round((r["mastery"] or 0) * 100)}
             for r in c.execute(
-        "SELECT subject, name, status, mastery FROM knowledge_points"
+        "SELECT id, subject, name, status, mastery FROM knowledge_points"
         " WHERE status NOT IN ('已掌握','未解锁') AND id NOT IN ('eng_vocab','chn_dictation')"
         " ORDER BY subject, mastery LIMIT 40")]
     attrs = {r["attribution"]: r["n"] for r in c.execute(
@@ -527,6 +530,176 @@ async def api_ai_advice(req: Request):
         return {"advice": advice}
     except Exception as e:
         return JSONResponse({"error": "AI建议生成失败：%s" % str(e)[:200]}, status_code=500)
+
+
+# ----------------------------------------------------------------------
+# 今日学习计划：从当前进度动态生成"今天学什么"
+# ----------------------------------------------------------------------
+@app.get("/api/today_plan")
+async def api_today_plan(req: Request):
+    """复用 daily.build_daily_plan，返回今天的结构化学习单。
+
+    纯本地算法（贪心 + 依赖 + 科目配比），零 AI 调用。
+    """
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    try:
+        from core import daily
+        plans = daily.build_daily_plan(c, date.today(), days=1)
+        if not plans or not plans[0].items:
+            return {"today": None, "items": [], "total_min": 0, "done": True}
+        dp = plans[0]
+        items = []
+        total = 0
+        for it in dp.items:
+            total += it.minutes
+            # 知识点是否已开始学（有进度）→ 前端区分"新学/继续"
+            row = c.execute(
+                "SELECT status, mastery FROM knowledge_points WHERE id=?", (it.kp_id,)).fetchone()
+            items.append({
+                "subject": it.subject, "kp_id": it.kp_id, "name": it.name,
+                "tier": it.tier, "weight": it.weight, "minutes": it.minutes,
+                "status": row["status"] if row else "",
+                "mastery": round((row["mastery"] or 0) * 100) if row else 0,
+            })
+        return {"today": dp.d.isoformat(), "items": items,
+                "total_min": total, "done": False}
+    except Exception as e:
+        return JSONResponse({"error": "生成计划失败：%s" % str(e)[:200]}, status_code=500)
+
+
+# ----------------------------------------------------------------------
+# 错题本：未解决错题列表（逐题重做）
+# ----------------------------------------------------------------------
+@app.get("/api/wrong_list")
+async def api_wrong_list(req: Request, subject: str = ""):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    s = None if not subject or subject == "全部" else subject
+    rows = db.open_wrongs(c, subject=s)
+    items = []
+    for w in rows:
+        items.append({
+            "wid": w["id"], "qid": w["question_id"], "subject": w["subject"],
+            "qtype": w["qtype"], "stem": w["stem"], "answer": w["answer"],
+            "analysis": w["analysis"] or "", "kp_id": w["kp_id"],
+            "attribution": w["attribution"], "wrong_count": w["wrong_count"],
+            "last_wrong": (w["last_wrong"] or "")[:10],
+        })
+    return {"items": items, "total": len(items)}
+
+
+# ----------------------------------------------------------------------
+# 600 分目标看板：六科目标分 / 里程碑 / 行政日期
+# ----------------------------------------------------------------------
+@app.get("/api/targets")
+async def api_targets(req: Request):
+    """返回目标分、里程碑、行政日期、高考倒计时（全部来自 config，零 AI）。"""
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    today = date.today()
+    exam = config.EXAM_DATE
+    days_left = (exam - today).days
+
+    # 六科当前掌握度（用于"目标 vs 现状"对照）
+    subjects = []
+    for s in config.SUBJECTS:
+        row = c.execute(
+            "SELECT SUM(status='已掌握') m, COUNT(*) n, AVG(mastery) avg FROM knowledge_points"
+            " WHERE subject=? AND id NOT IN ('eng_vocab','chn_dictation')", (s,)).fetchone()
+        subjects.append({
+            "subject": s,
+            "target": config.TARGET_SCORES.get(s, 0),
+            "full_mark": config.EXAM_FULL_MARK.get(s, 100),
+            "duration": config.EXAM_DURATION.get(s, 120),
+            "scoring": config.SCORING.get(s, "raw"),
+            "mastered": row["m"] or 0,
+            "total": row["n"] or 0,
+            "avg_mastery": round((row["avg"] or 0) * 100),
+        })
+
+    milestones = []
+    for m in config.MILESTONES:
+        on = m.on_date
+        reached = on <= today
+        milestones.append({
+            "day": m.day, "label": m.label,
+            "date": on.isoformat(), "reached": reached,
+            "targets": m.targets,
+        })
+
+    admin = []
+    for d, label in config.ADMIN_DEADLINES:
+        admin.append({"date": d.isoformat(), "label": label,
+                      "days_left": (d - today).days, "passed": d < today})
+
+    return {
+        "goal": config.GOAL_SCORE, "aim": config.AIM_SCORE,
+        "target_total": config.TARGET_TOTAL,
+        "exam_date": exam.isoformat(), "days_left": days_left,
+        "subjects": subjects, "milestones": milestones, "admin": admin,
+    }
+
+
+# ----------------------------------------------------------------------
+# 学习地图：165 知识点按科目×层级的总进度
+# ----------------------------------------------------------------------
+@app.get("/api/map")
+async def api_map(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    tree = queue.lesson_tree(c)
+    return {"tree": tree}
+
+
+# ----------------------------------------------------------------------
+# 入学诊断：快速自评初中/基础知识点（记得→跳过，忘了/没学过→学）
+# ----------------------------------------------------------------------
+@app.get("/api/diagnose/status")
+async def api_diagnose_status(req: Request):
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    # 诊断对象：初中层知识点（基础），逐个自评
+    rows = c.execute(
+        "SELECT id, subject, name, tier, weight, diagnosis, status FROM knowledge_points"
+        " WHERE tier='初中' AND id NOT IN ('eng_vocab','chn_dictation')"
+        " ORDER BY subject, weight DESC").fetchall()
+    items = [{
+        "kp_id": r["id"], "subject": r["subject"], "name": r["name"],
+        "weight": r["weight"], "diagnosis": r["diagnosis"], "status": r["status"],
+    } for r in rows]
+    done = sum(1 for i in items if i["diagnosis"])
+    return {"items": items, "total": len(items), "done": done,
+            "completed": done == len(items) and len(items) > 0}
+
+
+@app.post("/api/diagnose")
+async def api_diagnose(req: Request):
+    """记录一个知识点的诊断结果。'记得' → 直接标记已掌握（mastery=1.0）。"""
+    c, u = _conn_for(req)
+    if not c:
+        return JSONResponse({"error": "未登录"}, status_code=401)
+    body = await req.json() or {}
+    kp_id = body.get("kp_id", "")
+    result = body.get("result", "")
+    if result not in ("记得", "忘了", "从没学过"):
+        return JSONResponse({"error": "诊断结果必须是 记得/忘了/从没学过"}, status_code=400)
+    row = c.execute("SELECT id FROM knowledge_points WHERE id=?", (kp_id,)).fetchone()
+    if not row:
+        return JSONResponse({"error": "知识点不存在"}, status_code=400)
+    if result == "记得":
+        c.execute("UPDATE knowledge_points SET diagnosis=?, mastery=1.0, status='已掌握' WHERE id=?",
+                  (result, kp_id))
+    else:
+        c.execute("UPDATE knowledge_points SET diagnosis=? WHERE id=?", (result, kp_id))
+    c.commit()
+    graph.refresh_unlock(c)
+    return {"ok": True}
 
 
 # ----------------------------------------------------------------------

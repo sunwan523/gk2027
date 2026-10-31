@@ -511,4 +511,56 @@ ________________________________________________________________________________
             r"语言：第一人称 I，一般过去时为主；词数约 150；避免抄袭原文过多",
         ],
     },
+    {
+        "year": 2025,
+        "paper": "新课标I卷",
+        "question_no": "46",
+        "source_ref": "https://mp.weixin.qq.com/s?__biz=MzUyMDY0Mzc0Mw==&mid=2247484516&idx=1&sn=bac4f2541c4a37487b01340a74b6a28c",
+        "verified": 1,
+        "qtype": "作文",
+        "kp_id": "eng_write_apply",
+        "difficulty": 3,
+        "stem": "第一节（满分 15 分）\n"
+                "假定你是李华，你班的英语报要增设一个栏目。外教 Jenny 提出 “Fun at my school” 和 “Guess who I am” 两个选项供大家选择。请给 Jenny 写一封邮件，内容包括：\n"
+                "(1) 你的选择；\n"
+                "(2) 说明理由。\n"
+                "注意：(1) 写作词数应为 80 个左右；(2) 请按如下格式在答题卡的相应位置作答。",
+        "options": [],
+        "answer": "参考范文：\nDear Jenny,\nI really like the idea of adding a new column to our English newspaper. As far as I am concerned, the column \"Fun at my school\" is a better choice. My reasons are as follows.\nI believe this column will be more engaging for the majority of our classmates. It can cover a wide range of topics such as club experiences, amazing discoveries and extracurricular activities that take place in our school. They are not only fun, but also reflect our vibrant campus life. Moreover, it can encourage more students to participate in school activities and share their experiences, which will make our newspaper more colourful and appealing.\nThank you for considering my suggestion. Looking forward to your reply and the new column in our newspaper.\nYours,\nLi Hua",
+        "analysis": "解析：本篇为应用文（建议信/邮件）。核心是二选一并说明理由。要点：①明确选择（Fun at my school 或 Guess who I am 均可，关键是自圆其说）；②给出 2-3 条充分理由；③格式正确（称呼 Dear Jenny、落款 Yours, Li Hua）、词数 80 左右。高分句型可用 which 定语从句、not only...but also 等。",
+        "points": [
+            "①明确作出选择，观点鲜明（3分档）",
+            "②理由充分、有条理，2-3 条（6分档）",
+            "③格式正确、词数达标、语言流畅、书写工整（6分档）",
+        ],
+    },
+    {
+        "year": 2025,
+        "paper": "新课标I卷",
+        "question_no": "47",
+        "source_ref": "https://mp.weixin.qq.com/s?__biz=MzUyMDY0Mzc0Mw==&mid=2247484516&idx=1&sn=bac4f2541c4a37487b01340a74b6a28c",
+        "verified": 1,
+        "qtype": "作文",
+        "kp_id": "eng_write_cont",
+        "difficulty": 4,
+        "stem": "第二节（满分 25 分）\n"
+                "阅读下面材料，根据其内容和所给段落开头语续写两段，使之构成一篇完整的短文。\n\n"
+                "My wife and I wanted to share our new home with family and friends by hosting a small gathering in the early summer. She had prepared lots of snacks, while my job was to have the backyard in order. There was plenty of space for the kids to run and play. There was just one thing I hadn't counted on: My brother chose to bring his dog Toby, a 50-pound ball of fire. Though friendly, he could easily knock over my niece's small boys and my six-month-old granddaughter. So, when my brother showed up, I asked him to watch Toby and keep him outside.\n"
+                "My plan was working out just fine. Toby was using up his energy by running back and forth in the backyard and giving the kids plenty of room. Unexpectedly, after supper, the weather changed. It started to rain and everyone went indoors. It was an awkward moment. I didn't want Toby to be running around in the house, and my brother wasn't happy with driving home with a wet dog. Eventually, my brother decided to leave rather than force the issue.\n"
+                "A few days passed, and I hadn't heard anything from my brother. I texted him and expressed wishes for him to come out again. His reply came as a surprise — a shock, actually: \"Not a chance.\" Clearly, he was unhappy over the way we had parted. After all, I had left him little choice. Well, he'll get over it, I reasoned.\n"
+                "Two months passed. My wife suggested I get in touch with my brother, but I resisted, thinking he should call first. However, my conscience kept bothering me. I tried to put myself in my brother's shoes. He was facing health issues and his wife of thirty-five years had passed away a few months earlier. Toby was his constant companion, the one who kept him going.\n"
+                "注意：(1) 续写词数应为 150 个左右；(2) 请按如下格式在答题卡的相应位置作答。\n\n"
+                "I realized it was me who was at fault. ____________________________________\n"
+                "________________________________________________________________________\n"
+                "With the biscuits my wife had made, I arrived at my brother's door. ___________\n"
+                "________________________________________________________________________",
+        "options": [],
+        "answer": "参考范文：\nI realized it was me who was at fault. As I reflected on what had happened that evening, shame washed over me. My brother, already burdened with grief and loneliness, had only sought companionship in Toby, while I had treated them both as inconveniences. Instead of finding a compromise, by setting up a space indoors for the dog, I had prioritized my own comfort over his feelings. The thought of him spending these months being isolated filled me with deep regret. Seeing this, my wife decided to do something, so she baked some biscuits for me to bring to my brother.\nWith the biscuits my wife had made, I arrived at my brother's door. Hesitating, I raised my hand to knock, my heart pounding with uncertainty. When the door opened, my brother's eyes widened in surprise. Before he could speak, I handed him the biscuits, saying sorry to him sincerely. The stiffness in his expression softened slightly. It was at this moment that Toby bounced over, wagging his tail merrily. A faint smile touched my brother's lips, which spread into a brilliant smile. The next few hours witnessed us taking a walk outside and talking open-heartedly.",
+        "analysis": "解析：读后续写。主题是“承担责任与宽容”。原文讲述作者因哥哥带狗 Toby 参加聚会却不让狗进屋，导致兄弟产生隔阂；两个月后作者意识到自己错了（哥哥丧妻、患病，Toby 是他唯一的慰藉），主动登门道歉。续写要点：①第一段（I realized it was me who was at fault）——内心忏悔，意识到自己的自私；妻子烘焙饼干促成和解；②第二段（With the biscuits...）——登门道歉，哥哥由惊讶到释然，Toby 欢快地摇尾，兄弟重归于好。注意衔接段首语、情节合理、第一人称、过去时、词数约 150。",
+        "points": [
+            "第一段：内心忏悔、意识到自私；妻子烘焙饼干为和解做铺垫（10分档）",
+            "第二段：登门道歉；哥哥由惊讶到释然；Toby 摇尾呼应、兄弟和好（10分档）",
+            "衔接自然、情节合理、人称时态正确、词数约 150（5分档）",
+        ],
+    },
 ]

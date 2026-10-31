@@ -112,6 +112,7 @@ def build_daily_plan(conn: sqlite3.Connection, start: date, days: int = 30,
     cur: dict[str, str | None] = {s: None for s in SUBJECTS}
     for day in range(1, days + 1):
         dp = DailyPlan(day=day, d=start + timedelta(days=day - 1))
+        today_touched: set[str] = set()   # 当天已排过的知识点（每个点每天至多一次）
         unfinished = {s for s in SUBJECTS if any(
             i for i in todo if nodes[i]["subject"] == s and i not in done)}
         if not unfinished:
@@ -128,11 +129,18 @@ def build_daily_plan(conn: sqlite3.Connection, start: date, days: int = 30,
             while left >= 15:
                 i = cur[s]
                 if i is None:
-                    elig = eligible(s)
+                    elig = [x for x in eligible(s) if x not in today_touched]
                     if not elig:
                         break
                     i = cur[s] = elig[0]
+                    today_touched.add(i)
                 take = min(left, todo[i])
+                # 单知识点单日上限 60 分钟：避免"一个点刷 2 小时"的疲劳，
+                # 超出部分留到明天，保证每天节奏均衡、可持续。
+                capped = False
+                if take > 60:
+                    take = 60
+                    capped = True
                 if 0 < todo[i] - take < 15 and todo[i] <= left:
                     take = todo[i]
                 todo[i] -= take
@@ -150,6 +158,10 @@ def build_daily_plan(conn: sqlite3.Connection, start: date, days: int = 30,
                         # 若已解锁新节点则继续排第二个（依赖已满足才成立）
                         first = False
                         continue
+                elif capped:
+                    # 单日到上限但没学完：切换到下一个知识点（若还有）
+                    cur[s] = None
+                    continue
         # 日内补排：当天被解锁但没分到时间的科目，保底 30 分钟
         # （从当日"未学完"的最大条目让渡，不破坏依赖顺序）
         for s in SUBJECTS:

@@ -446,3 +446,146 @@ textarea.input { min-height:84px; resize:vertical; }
 .exam-meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:6px; }
 .src-link { font-size:11px; color:#4a90d9; text-decoration:none; white-space:nowrap; }
 .src-link:active { opacity:.7; }
+
+/* ============ 学习互动增强（讲→练→测） ============ */
+/* 考点地位徽章 */
+.w-badge { display:inline-block; font-size:10px; font-weight:600; border-radius:8px; padding:1px 7px; margin-left:6px; vertical-align:middle; white-space:nowrap; }
+.wb-high { color:#c0392b; background:#fdecea; border:1px solid #f5c6c6; }
+.wb-mid  { color:#2f6fb2; background:#eaf3fc; border:1px solid #cfe0f5; }
+.wb-low  { color:#8a94a6; background:#f2f3f7; border:1px solid #e3e4ea; }
+
+/* 三阶段进度导航 */
+.stage-nav { display:flex; align-items:center; gap:6px; padding:8px 2px 6px; }
+.stage-step { display:flex; align-items:center; gap:5px; flex:none; cursor:pointer; }
+.stage-step .sn { width:20px; height:20px; border-radius:50%; background:#e8eaf0; color:#9aa3b2; font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+.stage-step .sl { font-size:12px; color:#9aa3b2; }
+.stage-step.on .sn { background:#4a90d9; color:#fff; box-shadow:0 2px 6px rgba(74,144,217,.4); }
+.stage-step.on .sl { color:#2f6fb2; font-weight:600; }
+.stage-step.done .sn { background:#1fd16f; color:#fff; }
+.stage-step.done .sl { color:#2e7d32; }
+.stage-line { flex:1; height:2px; background:#e8eaf0; border-radius:1px; min-width:12px; }
+.stage-hint { font-size:12px; color:#a08b6a; background:#fffdf7; border:1px dashed #e0d5c5; border-radius:8px; padding:6px 10px; margin-bottom:8px; }
+
+/* 答题反馈 */
+.fb-analysis { background:#fff8ec; border-color:#f4e3c0; }
+.attr-tag-group { margin:10px 0; }
+.attr-tags { display:flex; flex-wrap:wrap; gap:6px; }
+.attr-tag { padding:6px 12px; font-size:13px; border:1px solid #e3e4ea; background:#fff; border-radius:16px; color:#555; cursor:pointer; }
+.attr-tag.on { background:#fdecea; border-color:#f5c6c6; color:#c0392b; font-weight:600; }
+.attr-tag:active { opacity:.7; }
+
+/* 通关页回顾 */
+.done-stats { display:flex; gap:8px; margin-top:12px; }
+.ds-item { flex:1; background:#f8fafc; border:1px solid #eef0f6; border-radius:10px; padding:10px 4px; text-align:center; }
+.ds-v { font-size:20px; font-weight:700; color:#2b4a8f; }
+.ds-l { font-size:11px; color:#888; margin-top:2px; }
+.done-wrong { border:1px solid #f0e2e2; background:#fffafa; border-radius:10px; padding:10px 12px; margin-bottom:8px; }
+.dw-q { font-size:13px; color:#444; line-height:1.6; }
+.dw-a { font-size:13px; color:#2e7d32; margin-top:4px; }
+
+/* 真题答题卡圆点 */
+.exam-dots { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0 2px; }
+.ex-dot { width:26px; height:26px; border-radius:50%; background:#f0f1f5; border:1px solid #e3e4ea; display:inline-block; cursor:pointer; position:relative; }
+.ex-dot.a { background:#4a90d9; border-color:#4a90d9; }
+.ex-dot.cur { box-shadow:0 0 0 2px #fff, 0 0 0 4px #4a90d9; }
+
+/* ============ 今日学习单 ============ */
+.today-card { background:linear-gradient(135deg,#f6f8ff,#eef3fb); border:1px solid #e3e8f5; border-radius:14px; padding:14px; margin-bottom:12px; }
+.today-card.done { background:linear-gradient(135deg,#f2fdf5,#e8f8ee); border-color:#cfe9d5; }
+.tc-head { display:flex; align-items:center; gap:8px; }
+.tc-ico { font-size:18px; }
+.tc-title { font-size:15px; font-weight:700; color:#2b4a8f; }
+.tc-total { margin-left:auto; font-size:12px; color:#4a90d9; background:#fff; border:1px solid #cfe0f5; border-radius:12px; padding:2px 10px; white-space:nowrap; }
+.tc-sub { font-size:12px; color:#888; margin:6px 0 10px; }
+.tc-items { display:flex; flex-direction:column; gap:6px; }
+.tc-item { display:flex; align-items:center; gap:8px; background:#fff; border:1px solid #eef0f6; border-radius:10px; padding:9px 12px; cursor:pointer; }
+.tc-item:active { background:#f5f8ff; }
+.tc-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+.tc-subj { font-size:12px; color:#888; flex:none; width:30px; }
+.tc-name { flex:1; font-size:14px; font-weight:600; color:#333; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.tc-min { font-size:12px; color:#999; flex:none; }
+.tc-go { font-size:12px; color:#4a90d9; font-weight:600; flex:none; }
+.tc-rolling { margin-top:8px; border-top:1px dashed #e0e5f0; padding-top:8px; }
+.tc-roll .tc-name { font-weight:400; color:#666; }
+.tc-roll .tc-dot { background:#c3c9d4 !important; }
+
+/* ============ 错题本 ============ */
+.wrong-entry { display:flex; align-items:center; gap:10px; background:#fff8ec; border:1px solid #f4e3c0; border-radius:12px; padding:12px 14px; margin-bottom:10px; cursor:pointer; }
+.wrong-entry:active { opacity:.85; }
+.we-ico { font-size:18px; }
+.we-txt { font-size:15px; font-weight:700; color:#a8822f; }
+.we-count { flex:1; font-size:12px; color:#b48a3a; }
+.we-go { font-size:13px; color:#e67e22; font-weight:600; }
+.wrong-item { background:#fff; border:1px solid #eef0f6; border-radius:12px; padding:12px 14px; margin-bottom:8px; }
+.wi-top { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
+.wi-subj { font-size:11px; font-weight:600; color:#2f6fb2; background:#eaf3fc; border-radius:8px; padding:1px 8px; }
+.wi-attr { font-size:11px; color:#c0392b; background:#fdecea; border-radius:8px; padding:1px 8px; }
+.wi-count { margin-left:auto; font-size:11px; color:#999; }
+.wi-stem { font-size:14px; color:#333; line-height:1.7; margin-bottom:8px; }
+.wi-redo { border:none; background:#4a90d9; color:#fff; border-radius:8px; padding:6px 16px; font-size:13px; cursor:pointer; }
+
+/* ============ 统计页行动卡 ============ */
+.action-card { display:flex; align-items:center; gap:10px; background:linear-gradient(135deg,#f6f8ff,#eef3fb); border:1px solid #e3e8f5; border-radius:14px; padding:12px 14px; margin-bottom:10px; }
+.ac-ico { font-size:22px; }
+.ac-main { flex:1; min-width:0; }
+.ac-title { font-size:15px; font-weight:700; color:#2b4a8f; }
+.ac-sub { font-size:12px; color:#888; margin-top:2px; }
+.ac-btn { border:none; background:#4a90d9; color:#fff; border-radius:8px; padding:7px 14px; font-size:13px; cursor:pointer; flex:none; }
+.ac-btn.ghost { background:#fff; color:#4a90d9; border:1px solid #cfe0f5; }
+
+/* ============ 入学诊断 ============ */
+.diag-card { background:linear-gradient(135deg,#fff7e8,#fef4e0); border:1px solid #f4e3c0; border-radius:14px; padding:14px; margin-bottom:12px; }
+.diag-head { display:flex; align-items:center; gap:8px; }
+.diag-ico { font-size:18px; }
+.diag-title { font-size:15px; font-weight:700; color:#a8822f; }
+.diag-prog { margin-left:auto; font-size:12px; color:#b48a3a; }
+.diag-sub { font-size:13px; color:#8a7450; line-height:1.6; margin:8px 0 10px; }
+.diag-btn { width:100%; border:none; background:#e67e22; color:#fff; border-radius:10px; padding:11px; font-size:15px; font-weight:600; cursor:pointer; }
+.diag-name { font-size:22px; font-weight:700; color:#1a1b1c; margin:10px 0 6px; }
+.diag-q { font-size:15px; color:#666; margin-bottom:14px; }
+.diag-opts { display:flex; flex-direction:column; gap:10px; }
+.diag-opt { padding:14px; font-size:16px; border-radius:12px; border:1px solid #ddd; background:#fff; cursor:pointer; }
+.diag-opt.do-remember { border-color:#b5ecd0; background:#f0faf4; color:#0b7a3d; }
+.diag-opt.do-forgot { border-color:#f4e3c0; background:#fff9ef; color:#a8822f; }
+.diag-opt.do-never { border-color:#e3e4ea; background:#fafbfc; color:#888; }
+.diag-opt:active { opacity:.8; }
+
+/* ============ 600 分目标看板 ============ */
+.m-item-hl { border-color:#4a90d9; background:linear-gradient(135deg,#eef4ff,#e6efff); color:#2f6fb2; font-weight:700; }
+.target-hero { background:linear-gradient(135deg,#5b7cfa,#7d5cf6); color:#fff; border-radius:16px; padding:20px 16px; text-align:center; margin-bottom:12px; }
+.th-goal { font-size:16px; opacity:.95; }
+.th-goal b { font-size:32px; }
+.th-sub { font-size:12px; opacity:.85; margin-top:4px; }
+.th-days { font-size:14px; margin-top:10px; background:rgba(255,255,255,.2); border-radius:12px; padding:6px; }
+.th-days b { font-size:18px; }
+.tgt-row { display:flex; align-items:center; gap:8px; margin:8px 0; }
+.tgt-subj { width:36px; font-size:13px; font-weight:600; color:#333; flex:none; }
+.tgt-bar { flex:1; height:8px; background:#eef0f6; border-radius:4px; overflow:hidden; }
+.tgt-fill { height:100%; background:linear-gradient(90deg,#4a90d9,#7d5cf6); border-radius:4px; transition:width .3s; }
+.tgt-val { font-size:11px; color:#888; flex:none; }
+.tgt-target { font-size:12px; color:#e67e22; font-weight:600; flex:none; width:64px; text-align:right; }
+.ms-item { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid #f0f1f4; font-size:13px; }
+.ms-item:last-child { border-bottom:none; }
+.ms-dot { flex:none; width:18px; text-align:center; }
+.ms-label { flex:1; color:#444; }
+.ms-date { font-size:11px; color:#999; flex:none; }
+.ms-tgt { font-size:11px; color:#4a90d9; flex:none; }
+.ms-item.reached { opacity:.6; }
+.ms-item.reached .ms-label { text-decoration:line-through; }
+
+/* ============ 学习地图 ============ */
+.map-legend { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; }
+.lg { font-size:11px; color:#666; display:flex; align-items:center; gap:4px; }
+.lg i { width:10px; height:10px; border-radius:50%; display:inline-block; }
+.map-subj { background:#fff; border:1px solid #eef0f6; border-radius:14px; padding:12px; margin-bottom:10px; }
+.map-subj-head { display:flex; align-items:center; margin-bottom:10px; }
+.map-subj-name { font-size:15px; font-weight:700; color:#333; }
+.map-subj-prog { margin-left:auto; font-size:12px; color:#888; }
+.map-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:6px; }
+.map-node { display:flex; align-items:center; gap:6px; padding:7px 8px; border:1px solid #eef0f6; border-radius:8px; cursor:pointer; font-size:12px; }
+.map-node:active { background:#f5f8ff; }
+.map-node.done { border-color:#cfe9d5; background:#f4fcf7; }
+.map-node.locked { opacity:.55; }
+.map-dot { width:8px; height:8px; border-radius:50%; flex:none; }
+.map-name { flex:1; color:#444; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.map-noq { font-size:10px; color:#e67e22; flex:none; }
